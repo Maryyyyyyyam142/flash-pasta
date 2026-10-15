@@ -53,6 +53,13 @@ Without PASTA the same model trains at about 176 img/s (640 px) and 48 img/s (12
 FlashPASTA costs about 1–4% of training throughput, while the official implementation never
 reaches the GPU's rate even with all 32 cores.
 
+### Case study: Red Sea coral reefs (Marjan dataset)
+
+Same setup on 9,498 real 640×640 underwater images of healthy, bleached and dead coral [4],
+8 CPU workers: the official implementation trains at 46.9 img/s with the GPU waiting for data
+74% of the time; FlashPASTA trains at 169.1 img/s with 0.2% waiting (3.6×), cutting an epoch
+from 3.4 to 0.9 minutes.
+
 All raw numbers are in `results/` and on the poster (`poster/poster.pdf`).
 
 ## Usage
