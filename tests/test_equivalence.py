@@ -12,6 +12,7 @@ Usage: python tests/test_equivalence.py [--image path] [--device cuda:0] [--out 
 """
 import argparse
 import json
+import math
 import sys
 from pathlib import Path
 
@@ -59,8 +60,9 @@ def exact_test(img, device, seed=0):
     return {"H": H, "W": W, "seed": seed, "variants": rows}
 
 
-def noise_distribution_test(H, W, device, n=20000):
+def noise_distribution_test(H, W, device, n=20000, seed=0):
     """Compare our sampled half-spectrum noise with the symmetrised reference noise."""
+    torch.manual_seed(seed)
     p = PASTA(ALPHA, BETA, K, use_rfft=True)
     t = p._get_tables(H, W, device, torch.float64)
     ours = PASTA.sample_half_noise((n, 3, H, W // 2 + 1), t, torch.float64)
@@ -119,7 +121,8 @@ def main():
     report = {"alpha": ALPHA, "beta": BETA, "k": K, "device": str(device),
               "image": Path(args.image).name if args.image else "random"}
     report["exact"] = [exact_test(c.contiguous(), device, seed=i) for i, c in enumerate(crops)]
-    report["noise_distribution"] = [noise_distribution_test(h, w, device) for h, w in [(16, 24), (15, 23), (16, 23)]]
+    report["noise_distribution"] = [noise_distribution_test(h, w, device)
+                                    for h, w in [(16, 24), (15, 23), (16, 23), (15, 24)]]
     report["output_distribution"] = output_distribution_test(full[:, :48, :64].contiguous(), device)
 
     Path(args.out).parent.mkdir(parents=True, exist_ok=True)
@@ -134,8 +137,10 @@ def main():
             print(f"exact {r['H']}x{r['W']} {name:11s} max_err={v['max_abs_err']:.2e} "
                   f"uint8_diff_frac={v['uint8_pixels_differing_frac']:.2e} {'PASS' if passed else 'FAIL'}")
     for r in report["noise_distribution"]:
-        passed = r["edge_column_symmetry_max_err"] == 0 and 0.97 < r["std_ratio_min"] and r["std_ratio_max"] < 1.03 \
-            and r["mean_abs_z_gt3_frac"] < 0.02
+        # each std ratio compares two independent n-sample estimates (log-ratio SE = 1/sqrt(n)); allow 5 SE per cell
+        tol = 5 / math.sqrt(r["samples"])
+        passed = r["edge_column_symmetry_max_err"] == 0 and 1 - tol < r["std_ratio_min"] \
+            and r["std_ratio_max"] < 1 + tol and r["mean_abs_z_gt3_frac"] < 0.02
         ok &= passed
         print(f"noise {r['H']}x{r['W']} std_ratio=[{r['std_ratio_min']:.3f},{r['std_ratio_max']:.3f}] "
               f"|z|>3 frac={r['mean_abs_z_gt3_frac']:.4f} {'PASS' if passed else 'FAIL'}")
