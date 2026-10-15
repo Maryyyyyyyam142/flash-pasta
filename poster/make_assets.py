@@ -40,6 +40,38 @@ def example(seed=3):
     print("example frame:", src.name)
 
 
+CORAL_CLASSES = {0: "bleached", 1: "dead", 2: "healthy"}
+
+
+def coral_thumbs(size=420):
+    """One Marjan test image per class (first, sorted, whose boxes are all that class), boxes drawn in white."""
+    from PIL import ImageDraw
+
+    root = ROOT / "data/marjan/test"
+    if not root.exists():
+        return
+    for cls, name in CORAL_CLASSES.items():
+        for lbl in sorted((root / "labels").glob("*.txt")):
+            rows = [l.split() for l in lbl.read_text().splitlines() if l.strip()]
+            if not (rows and all(int(r[0]) == cls for r in rows) and len(rows) <= 3):
+                continue
+            if all(float(r[3]) * float(r[4]) > 0.6 for r in rows):
+                continue  # box would hug the frame edge
+            img = Image.open(next((root / "images").glob(f"{lbl.stem}.*"))).convert("RGB").resize((size, size))
+            arr = np.asarray(img)
+            corners = [arr[:24, :24], arr[:24, -24:], arr[-24:, :24], arr[-24:, -24:]]
+            if min(c.mean() for c in corners) < 20:
+                continue  # black fill from the dataset's rotation augmentation
+            if True:
+                d = ImageDraw.Draw(img)
+                for _, x, y, w, h in ([float(v) for v in r] for r in rows):
+                    d.rectangle([(x - w / 2) * size, (y - h / 2) * size, (x + w / 2) * size, (y + h / 2) * size],
+                                outline="white", width=5)
+                img.save(FIG / f"coral_{name}.jpg", quality=90)
+                print(f"coral {name}: {lbl.stem}")
+                break
+
+
 def qr():
     url = json.loads((ROOT / "poster/authors.json").read_text()).get("code_url")
     if url:
@@ -50,4 +82,5 @@ def qr():
 if __name__ == "__main__":
     FIG.mkdir(exist_ok=True)
     example()
+    coral_thumbs()
     qr()

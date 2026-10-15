@@ -102,6 +102,21 @@ def numbers():
         n["t_demand"] = demand
         ok = sorted(r["workers"] for r in single if r["pasta_mode"] == "gpu" and r["img_per_s_global"] >= 0.9 * demand)
         n["t_gpu_min_w"] = ok[0] if ok else None
+    mj = []
+    if (RES / "train_marjan").exists():
+        for p in sorted((RES / "train_marjan").glob("*.json")):
+            d = json.loads(p.read_text())
+            mj.append({**d["meta"], **d["epochs"][-1]})
+    mpick = lambda mode: next((r for r in mj if r["pasta_mode"] == mode and r["workers"] == HEADLINE_WORKERS), None)  # noqa: E731
+    m_off, m_gpu = mpick("cpu_official"), mpick("gpu")
+    m_train = ROOT / "data/marjan/train/images"
+    n["m_images"] = len(list(m_train.iterdir())) if m_train.exists() else 9498
+    if m_off and m_gpu:
+        n.update(m_off=m_off["img_per_s_global"], m_gpu=m_gpu["img_per_s_global"],
+                 m_off_stall=100 * m_off["data_wait_frac"], m_gpu_stall=100 * m_gpu["data_wait_frac"])
+        n["m_speedup"] = n["m_gpu"] / n["m_off"]
+        n["m_epoch_off"] = n["m_images"] / n["m_off"] / 60
+        n["m_epoch_gpu"] = n["m_images"] / n["m_gpu"] / 60
     hi = [r for r in runs if r["world_size"] == 1 and r["imgsz"] == 1280]
     if hi:
         n["hi"] = {(r["pasta_mode"], r["workers"]): r for r in hi}
@@ -194,6 +209,26 @@ def build():
     short_gpu = n.get("gpu_name", "").replace("NVIDIA ", "")
     short_cpu = re.sub(r"^AMD Ryzen |^Intel\(R\) ", "", n.get("cpu_name", ""))
     short_cpu = re.sub(r" (\d+)-Cores?$", r" (\1 cores)", short_cpu)
+    if "m_speedup" in n:
+        coral_rows = f"""
+  <table class="res">
+    <tr><th>{HEADLINE_WORKERS} CPU workers, 640 px</th><th class="off">Official, CPU</th><th class="gpu">FlashPASTA, GPU</th></tr>
+    <tr><td>Training throughput</td><td>{fmt(n['m_off'])} img/s</td><td><b>{fmt(n['m_gpu'])} img/s</b></td></tr>
+    <tr><td>GPU waiting for data</td><td>{fmt(n['m_off_stall'])}%</td><td><b>{fmt(n['m_gpu_stall'], 1)}%</b></td></tr>
+    <tr><td>One epoch ({fmt(n['m_images'])} images)</td><td>{fmt(n['m_epoch_off'], 1)} min</td><td><b>{fmt(n['m_epoch_gpu'], 1)} min</b></td></tr>
+  </table>"""
+        coral_head = f"4 · Red Sea corals: {fmt(n['m_speedup'], 1)}× faster training"
+    else:
+        coral_rows = "<p class='pending'>Coral runs in progress.</p>"
+        coral_head = "4 · Red Sea coral reefs"
+    thumbs = "".join(f'<div><img src="../figures/coral_{c}.jpg"><div class="lbl">{c.capitalize()}</div></div>'
+                     for c in ("healthy", "bleached", "dead") if (ROOT / f"figures/coral_{c}.jpg").exists())
+    coral_html = f"""<section><h2>{coral_head}</h2>
+  <p>Real underwater imagery: the Marjan dataset [4], {fmt(n['m_images'])} training images of healthy,
+  bleached and dead coral, same YOLO26s setup.</p>
+  <div class="corals">{thumbs}</div>
+  {coral_rows}</section>"""
+
     loader_claim = (f"GPU PASTA is nearly free" if n.get("ld_gpu_frac", 0) >= 0.9 else "PASTA on CPU vs GPU")
     dotted_note = " Dotted line: the rate YOLO26s trains at when data is never late." if has_train else ""
     train_claim = (f"YOLO training: {fmt(n['t_speedup'], 1)}× faster epochs" if has_train
@@ -242,6 +277,10 @@ img.fig {{ width: 100%; display: block; margin: 1mm 0 2mm; }}
 .example > div {{ flex: 1; }}
 .example img {{ width: 100%; display: block; border-radius: 2mm; }}
 .example .lbl {{ font-size: 24pt; color: #52514e; margin-top: 1mm; }}
+.corals {{ display: flex; gap: 4mm; margin: 2mm 0 3mm; }}
+.corals > div {{ flex: 1; }}
+.corals img {{ width: 100%; display: block; border-radius: 2mm; }}
+.corals .lbl {{ font-size: 24pt; color: #52514e; margin-top: 1mm; text-align: center; }}
 svg.pipe {{ width: 100%; display: block; margin: 1mm 0 4mm; }}
 .eq {{ font-family: 'DejaVu Sans Mono', monospace; font-size: 25pt; background: #f4f3f0; padding: 3mm 4mm;
        border-radius: 2mm; margin: 2mm 0 0; }}
@@ -309,6 +348,12 @@ footer .link {{ text-align: right; white-space: nowrap; font-size: 22pt; color: 
   <img class="fig" src="../figures/fig2_loader.svg">
   <p class="caption"><b>Figure 2.</b> Images/s a PyTorch DataLoader delivers on Sim10k (JPEG decode →
   letterbox → PASTA) vs CPU workers.{dotted_note}</p></section>
+  <section class="box"><h2>Takeaways</h2><ul>
+    <li>FlashPASTA on one GPU is {fmt(n.get('k_speedup'))}× faster than the official code on {n.get('maxp', 32)} CPU cores,
+    with the same output up to floating-point rounding.</li>
+    <li>It no longer eats the CPU-core budget, so a node feeds its GPU with a few workers.</li>
+    <li>Restructuring ({fmt(n.get('k_alg'), 1)}× on one core) and the real-FFT identity ({fmt(n.get('k_rfft'), 1)}× on GPU)
+    apply to any Fourier-domain augmentation.</li></ul></section>
 </div>
 <div class="col wide">
   <section><h2>3 · {train_claim}</h2>
@@ -316,12 +361,7 @@ footer .link {{ text-align: right; white-space: nowrap; font-size: 22pt; color: 
   <p class="caption"><b>Figure 3.</b> YOLO26s, 640 px, batch 16, one RTX A5000, mixed precision; mosaic off so
   every mode sees identical inputs.</p>
   {train_html}</section>
-  <section class="box"><h2>Takeaways</h2><ul>
-    <li>FlashPASTA on one GPU is {fmt(n.get('k_speedup'))}× faster than the official code on {n.get('maxp', 32)} CPU cores,
-    with the same output up to floating-point rounding.</li>
-    <li>It no longer eats the CPU-core budget, so a node feeds its GPU with a few workers.</li>
-    <li>Restructuring ({fmt(n.get('k_alg'), 1)}× on one core) and the real-FFT identity ({fmt(n.get('k_rfft'), 1)}× on GPU)
-    apply to any Fourier-domain augmentation.</li></ul></section>
+{coral_html}
 </div>
 </div>
 </main>
@@ -330,7 +370,9 @@ footer .link {{ text-align: right; white-space: nowrap; font-size: 22pt; color: 
   [1] P. Chattopadhyay, K. Sarangmath, V. Vijaykumar, J. Hoffman. PASTA: Proportional Amplitude Spectrum Training
   Augmentation for Syn-to-Real Domain Generalization. ICCV 2023.
   [2] M. Johnson-Roberson et al. Driving in the Matrix. ICRA 2017. Sim10k, doi:10.7302/e1f1-3d97, CC BY-NC 4.0.
-  [3] Ultralytics YOLO26.</div>
+  [3] Ultralytics YOLO26.
+  [4] A. Aldhahri, E. Saif, H. Ali, M. Alsayed, F. Alshareef. Harnessing Computer Vision and Deep Learning to Monitor
+  Coral Reef Health. ETASR 15(4), 2025, doi:10.48084/etasr.10324; Marjan dataset, Roboflow Universe, CC BY 4.0.</div>
   {f'<div class="link">{escape(code_url.removeprefix("https://"))}</div>' if code_url else ""}
 </footer>
 </body></html>"""
