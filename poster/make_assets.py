@@ -67,7 +67,7 @@ def coral_thumbs(size=420):
                 for _, x, y, w, h in ([float(v) for v in r] for r in rows):
                     d.rectangle([(x - w / 2) * size, (y - h / 2) * size, (x + w / 2) * size, (y + h / 2) * size],
                                 outline="white", width=5)
-                img.save(FIG / f"coral_{name}.jpg", quality=90)
+                img.crop((0, size // 8, size, size - size // 8)).save(FIG / f"coral_{name}.jpg", quality=90)  # 4:3
                 print(f"coral {name}: {lbl.stem}")
                 break
 
