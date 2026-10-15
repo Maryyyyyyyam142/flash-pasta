@@ -2,7 +2,7 @@
 # Full benchmark on real Sim10k, single GPU (physical id 2). Sequential so runs don't share CPUs.
 set -u
 cd "$(dirname "$0")"
-PY=.venv/bin/python
+PY=${PY:-.venv/bin/python}
 GPU=${GPU:-2}
 mkdir -p results/train logs
 
