@@ -6,6 +6,7 @@ benchmarks and this script keeps the poster consistent.
 Usage: .venv/bin/python bench/plot.py && .venv/bin/python poster/build_poster.py
 """
 import json
+import re
 from html import escape
 from pathlib import Path
 
@@ -69,6 +70,10 @@ def numbers():
                                         if str(r["imgsz"]) == sz and r["mode"] == mode and r["workers"] == w), None)
         n["ld_decode1"] = get("640", "none", 1)
         n["ld_off1"] = get("640", "cpu_official", 1)
+        none_w, gpu_w, off_w = (get("640", m, HEADLINE_WORKERS) for m in ("none", "gpu", "cpu_official"))
+        if none_w and gpu_w and off_w:
+            n["ld_gpu_frac"] = gpu_w / none_w
+            n["ld_off_slow"] = none_w / off_w
 
     runs = []
     tdir = RES / "train"
@@ -151,7 +156,7 @@ def build():
     has_train = "t_speedup" in n
 
     tiles = [
-        (f"{fmt(n.get('k_speedup'))}×", f"faster: FlashPASTA on 1 GPU vs the official code on {n.get('maxp', 32)} CPU cores"),
+        (f"{fmt(n.get('k_speedup'))}×", f"FlashPASTA on 1 GPU vs official code on {n.get('maxp', 32)} CPU cores"),
         (f"{fmt(n.get('t_off_stall'))}% → {fmt(n.get('t_gpu_stall'), 1)}%" if has_train else "pending",
          f"of training time the GPU sits waiting for data ({HEADLINE_WORKERS} CPU workers)"),
         (f"{fmt(n.get('t_speedup'), 1)}×" if has_train else "pending",
@@ -186,13 +191,24 @@ def build():
 
     qr_html = f"""<div class="qr"><img src="../figures/qr_code.svg"><div>Code &amp; data</div></div>""" if has_qr else ""
 
+    short_gpu = n.get("gpu_name", "").replace("NVIDIA ", "")
+    short_cpu = re.sub(r"^AMD Ryzen |^Intel\(R\) ", "", n.get("cpu_name", ""))
+    short_cpu = re.sub(r" (\d+)-Cores?$", r" (\1 cores)", short_cpu)
+    loader_claim = (f"GPU PASTA is nearly free" if n.get("ld_gpu_frac", 0) >= 0.9 else "PASTA on CPU vs GPU")
+    dotted_note = " Dotted line: the rate YOLO26s trains at when data is never late." if has_train else ""
+    train_claim = (f"YOLO training: {fmt(n['t_speedup'], 1)}× faster epochs" if has_train
+                   else "YOLO training on Sim10k")
+
     html = f"""<!doctype html><html><head><meta charset="utf-8"><title>FlashPASTA poster</title>
 <style>
 @page {{ size: 1189mm 841mm; margin: 0; }}
 * {{ box-sizing: border-box; }}
 html, body {{ margin: 0; }}
 body {{ width: 1189mm; height: 841mm; position: relative; overflow: hidden; font-family: 'Noto Sans', sans-serif;
-       font-size: 26pt; line-height: 1.3; color: #0b0b0b; background: #fff; }}
+       font-size: 29pt; line-height: 1.32; color: #0b0b0b; background: #fff; }}
+sup {{ line-height: 0; font-size: 0.7em; }}
+b {{ font-weight: 700; }}
+.lead {{ font-size: 29pt; font-weight: 600; color: #184f95; margin-bottom: 3mm; }}
 header {{ background: #184f95; color: #fff; padding: 14mm 30mm 12mm; position: relative; }}
 header .titles {{ margin-right: 330mm; }}
 header .right {{ position: absolute; right: 30mm; top: 0; bottom: 0; display: flex; align-items: center; gap: 12mm; }}
@@ -208,27 +224,28 @@ h1 {{ font-size: 80pt; line-height: 1.04; margin: 0 0 6mm; letter-spacing: -0.5p
 main {{ padding: 9mm 30mm 0; }}
 .tiles {{ display: flex; gap: 10mm; margin-bottom: 9mm; }}
 .tile {{ flex: 1; background: #f4f3f0; border-top: 2.5mm solid #2a78d6; border-radius: 0 0 3mm 3mm; padding: 5mm 7mm 6mm; }}
-.tile .big {{ font-size: 62pt; font-weight: 700; color: #184f95; line-height: 1.05; }}
-.tile .cap {{ font-size: 24pt; color: #52514e; line-height: 1.25; }}
+.tile .big {{ font-size: 68pt; font-weight: 700; color: #184f95; line-height: 1.05; }}
+.tile .cap {{ font-size: 25pt; color: #52514e; line-height: 1.25; }}
 .cols {{ display: flex; gap: 16mm; align-items: flex-start; }}
 .col {{ flex: 1; }}
-section {{ margin-bottom: 9mm; }}
+section {{ margin: 0 0 8mm; }}
+/*BALANCE*/
 .col.wide {{ flex: 1.08; }}
-h2 {{ font-size: 38pt; color: #184f95; margin: 0 0 4mm; padding-left: 5mm; border-left: 3mm solid #2a78d6;
+h2 {{ font-size: 42pt; color: #184f95; margin: 0 0 4mm; padding-left: 5mm; border-left: 3mm solid #2a78d6;
       line-height: 1.15; }}
 p {{ margin: 0 0 3.5mm; }}
 ul {{ margin: 0 0 3mm; padding-left: 9mm; }} li {{ margin-bottom: 2mm; }}
 img.fig {{ width: 100%; display: block; margin: 1mm 0 2mm; }}
-.caption {{ font-size: 24pt; color: #52514e; line-height: 1.25; margin: 0; }}
+.caption {{ font-size: 25pt; color: #3d3c39; line-height: 1.25; margin: 0; }}
 .caption b {{ color: #0b0b0b; }}
 .example {{ display: flex; gap: 4mm; margin: 2mm 0 4mm; }}
 .example > div {{ flex: 1; }}
 .example img {{ width: 100%; display: block; border-radius: 2mm; }}
-.example .lbl {{ font-size: 22pt; color: #52514e; margin-top: 1mm; }}
+.example .lbl {{ font-size: 24pt; color: #52514e; margin-top: 1mm; }}
 svg.pipe {{ width: 100%; display: block; margin: 1mm 0 4mm; }}
-.eq {{ font-family: 'DejaVu Sans Mono', monospace; font-size: 23pt; background: #f4f3f0; padding: 3mm 4mm;
+.eq {{ font-family: 'DejaVu Sans Mono', monospace; font-size: 25pt; background: #f4f3f0; padding: 3mm 4mm;
        border-radius: 2mm; margin: 2mm 0 0; }}
-table {{ border-collapse: collapse; width: 100%; font-size: 25pt; margin: 2mm 0 4mm; }}
+table {{ border-collapse: collapse; width: 100%; font-size: 27pt; margin: 2mm 0 4mm; }}
 th, td {{ text-align: left; padding: 2mm 3mm; border-bottom: 0.5mm solid #d6d5d0; vertical-align: top; }}
 th {{ color: #52514e; font-weight: 600; }}
 td.num {{ text-align: right; font-weight: 700; color: #184f95; white-space: nowrap; }}
@@ -260,19 +277,19 @@ footer .link {{ text-align: right; white-space: nowrap; font-size: 22pt; color: 
 <div class="col">
   <section><h2>The problem</h2>
   <p>Synthetic frames come with free labels, but detectors trained on them lose accuracy on real photos.
-  <b>PASTA</b> [1] narrows the gap by randomly perturbing each image's Fourier amplitude spectrum,
+  <b>PASTA</b> [1] closes part of the gap by randomly perturbing each image's Fourier amplitude spectrum,
   more strongly at high frequencies.</p>
   {example_html}
-  <p>The official code runs inside CPU data-loader workers, one image at a time, with float64 FFTs and the
-  noise mask rebuilt on every call: <b>{fmt(n.get('k_off1'), 1)} images/s per core</b> at 1914×1052.
-  At 640 px it cuts a worker from {fmt(n.get('ld_decode1'))} to {fmt(n.get('ld_off1'), 1)} images/s.</p></section>
+  <p>The official code runs per image inside CPU data-loader workers, with float64 FFTs and the noise mask
+  rebuilt on every call: <b>{fmt(n.get('k_off1'), 1)} images/s per core</b> at 1914×1052. At 640 px it slows a
+  worker from <b>{fmt(n.get('ld_decode1'))} to {fmt(n.get('ld_off1'), 1)} images/s</b>.</p></section>
   <section><h2>FlashPASTA</h2>
   {PIPELINE_SVG.replace("<svg ", '<svg class="pipe" ', 1)}
   <ul>
-    <li><b>Batched cuFFT on the GPU</b>, once the batch has been transferred</li>
+    <li><b>Batched cuFFT on the GPU</b> after the batch is transferred</li>
     <li><b>Noise mask cached</b> per image size</li>
-    <li><b>F·ε instead of |F|·ε·e<sup>iφ</sup></b>: no abs, angle or exp</li>
-    <li><b>Real FFT</b>: the official code keeps only the real part, and</li>
+    <li><b>F·ε replaces |F|·ε·e<sup>iφ</sup></b>: no abs, angle or exp</li>
+    <li><b>Half-size real FFT</b>, exact because only the real part is kept:</li>
   </ul>
   <div class="eq">Re IFFT(F·ε) = IRFFT(F·(ε(f)+ε(−f))/2)</div></section>
   <section><h2>Same output as the official code</h2>
@@ -284,21 +301,20 @@ footer .link {{ text-align: right; white-space: nowrap; font-size: 22pt; color: 
   </table></section>
 </div>
 <div class="col wide">
-  <section><h2>1 · The augmentation alone</h2>
+  <section><h2>1 · PASTA alone: {fmt(n.get('k_speedup'))}× faster on one GPU</h2>
   <img class="fig" src="../figures/fig1_kernel.svg">
-  <p class="caption"><b>Figure 1.</b> Images/s of PASTA only. {escape(n.get('gpu_name', ''))} vs
-  {escape(n.get('cpu_name', ''))}; CPU runs use single-threaded processes, as in data-loader workers.
-  Speed-ups vs the official code on {n.get('maxp', 32)} cores.</p></section>
-  <section><h2>2 · Feeding the GPU</h2>
+  <p class="caption"><b>Figure 1.</b> Augmentation only, no data loading. {escape(short_gpu)} vs
+  {escape(short_cpu)}; CPU runs use single-threaded processes, like data-loader workers.</p></section>
+  <section><h2>2 · Data loading: {loader_claim}</h2>
   <img class="fig" src="../figures/fig2_loader.svg">
   <p class="caption"><b>Figure 2.</b> Images/s a PyTorch DataLoader delivers on Sim10k (JPEG decode →
-  letterbox → PASTA) by number of CPU workers. Dotted line: the rate YOLO26s trains at when data is never late.</p></section>
+  letterbox → PASTA) vs CPU workers.{dotted_note}</p></section>
 </div>
 <div class="col wide">
-  <section><h2>3 · YOLO training on Sim10k</h2>
+  <section><h2>3 · {train_claim}</h2>
   <img class="fig" src="../figures/fig3_train.svg">
-  <p class="caption"><b>Figure 3.</b> YOLO26s, 640 px, batch 16, one RTX A5000, mixed precision, mosaic off
-  so all modes see identical inputs; steady-state epoch on 2,000 images.</p>
+  <p class="caption"><b>Figure 3.</b> YOLO26s, 640 px, batch 16, one RTX A5000, mixed precision; mosaic off so
+  every mode sees identical inputs.</p>
   {train_html}</section>
   <section class="box"><h2>Takeaways</h2><ul>
     <li>FlashPASTA on one GPU is {fmt(n.get('k_speedup'))}× faster than the official code on {n.get('maxp', 32)} CPU cores,
@@ -318,12 +334,46 @@ footer .link {{ text-align: right; white-space: nowrap; font-size: 22pt; color: 
   {f'<div class="link">{escape(code_url.removeprefix("https://"))}</div>' if code_url else ""}
 </footer>
 </body></html>"""
+    html = html.replace("/*BALANCE*/", balance_css(html))
     out = POSTER / "poster.html"
     out.write_text(html)
+    doc = render(html)
+    assert len(doc.pages) == 1, f"poster overflows to {len(doc.pages)} pages"
+    doc.write_pdf(POSTER / "poster.pdf")
+    print("wrote", POSTER / "poster.pdf")
+
+
+def render(html):
     from weasyprint import HTML
 
-    HTML(filename=str(out), base_url=str(POSTER)).write_pdf(POSTER / "poster.pdf")
-    print("wrote", POSTER / "poster.pdf")
+    return HTML(string=html, base_url=str(POSTER)).render()
+
+
+PX_PER_MM = 96 / 25.4
+
+
+def balance_css(html, max_gap_mm=30, bottom_pad_mm=6):
+    """Lay the page out once, then spread each column's spare height evenly between its sections,
+    so all columns end at the same line above the footer (WeasyPrint's column flexbox is unreliable)."""
+    page = render(html).pages[0]._page_box
+    first = {}
+    for box in page.descendants():
+        el = getattr(box, "element", None)
+        if el is not None and id(el) not in first and box.element_tag in {"div", "section", "footer"}:
+            first[id(el)] = (el, box)
+    cols = [(el, b) for el, b in first.values() if el.tag == "div" and "col" in (el.get("class") or "").split()]
+    footer = next(b for el, b in first.values() if el.tag == "footer")
+    limit = footer.position_y - bottom_pad_mm * PX_PER_MM
+    rules = []
+    for i, (col_el, col_box) in enumerate(sorted(cols, key=lambda c: c[1].position_x), start=1):
+        secs = [first[id(ch)][1] for ch in col_el if ch.tag == "section" and id(ch) in first]
+        if len(secs) < 2:
+            continue
+        bottom = max(b.position_y + b.margin_height() for b in secs)
+        spare_mm = (limit - bottom) / PX_PER_MM
+        gap = 8 + max(0.0, min(max_gap_mm - 8, spare_mm / (len(secs) - 1)))
+        rules.append(f".col:nth-child({i}) > section {{ margin-bottom: {gap:.1f}mm; }}")
+    return "\n".join(rules)
 
 
 if __name__ == "__main__":
