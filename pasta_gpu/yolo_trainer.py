@@ -121,6 +121,10 @@ class PastaDetectionTrainer(DetectionTrainer):
 
     # --- timing callbacks (each receives the trainer, i.e. self) ---
     def _on_train_epoch_start(self, _):
+        # Ultralytics silently lowers the worker count (CPU cores per visible GPU); the sweeps depend on it
+        if self.train_loader.num_workers != self.args.workers:
+            raise RuntimeError(f"data loader uses {self.train_loader.num_workers} workers, "
+                               f"not the {self.args.workers} requested")
         if RANK in {-1, 0} and not hasattr(self, "_sampler"):
             self._sampler = GPUUtilSampler(self.args.device)
             self._sampler.start()

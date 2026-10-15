@@ -9,7 +9,8 @@ Two GPUs (DDP):
   python bench/train_yolo.py --mode gpu --workers 4 --device 1,2 --batch 32 ...
 
 --device takes torch device indices, which are the nvidia-smi ids when
-CUDA_VISIBLE_DEVICES is unset (Ultralytics leaves CUDA_VISIBLE_DEVICES unchanged).
+CUDA_VISIBLE_DEVICES is unset. Only those GPUs are made visible to the run, because
+Ultralytics caps data-loader workers at cpu_count // visible GPUs (64 // 4 = 16 on our node).
 """
 import argparse
 import os
@@ -41,6 +42,11 @@ def main():
         "PASTA_MODE": args.mode, "PASTA_ALPHA": str(args.alpha), "PASTA_BETA": str(args.beta),
         "PASTA_K": str(args.k), "PASTA_TIMING_OUT": str(Path(args.out).resolve()),
     })
+    # Hide the GPUs we don't train on (before CUDA initialises) so the worker cap doesn't apply
+    ids = [int(i) for i in args.device.replace("cuda:", "").split(",")]
+    visible = os.getenv("CUDA_VISIBLE_DEVICES")
+    os.environ["CUDA_VISIBLE_DEVICES"] = ",".join(visible.split(",")[i] if visible else str(i) for i in ids)
+    device = ",".join(str(i) for i in range(len(ids)))
 
     from ultralytics import YOLO
 
@@ -50,7 +56,7 @@ def main():
     YOLO(args.model).train(
         trainer=PastaDetectionTrainer,
         data=args.data, imgsz=args.imgsz, batch=args.batch, epochs=args.epochs, workers=args.workers,
-        device=args.device, fraction=args.fraction,
+        device=device, fraction=args.fraction,
         mosaic=0.0, close_mosaic=0,  # identical per-image inputs for cpu and gpu PASTA
         cache=False, plots=False, save=False, val=False, amp=True, deterministic=False,
         project=str(ROOT / "runs"), name=name, exist_ok=True, verbose=False,
