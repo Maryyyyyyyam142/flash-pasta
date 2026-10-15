@@ -109,6 +109,7 @@ class PastaDetectionTrainer(DetectionTrainer):
 
     def preprocess_batch(self, batch):
         batch = super().preprocess_batch(batch)
+        self._t["batch_images"] = len(batch["img"])  # the last batch of an epoch can be partial
         if self.gpu_pasta is not None:
             start, end = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
             start.record()
@@ -140,7 +141,7 @@ class PastaDetectionTrainer(DetectionTrainer):
         self._t["step"] += now - self._t["batch_start"]
         self._t["last_end"] = now
         self._t["batches"] += 1
-        self._t["images"] += self.batch_size
+        self._t["images"] += self._t["batch_images"]
 
     def _on_train_epoch_end(self, _):
         if RANK not in {-1, 0}:
