@@ -6,6 +6,7 @@ benchmarks and this script keeps the poster consistent.
 Usage: .venv/bin/python bench/plot.py && .venv/bin/python poster/build_poster.py
 """
 import json
+import math
 import re
 from html import escape
 from pathlib import Path
@@ -32,6 +33,11 @@ def fmt(v, digits=0):
     if v is None:
         return "—"
     return f"{v:,.{digits}f}"
+
+
+def fmt_max(v, digits=1):
+    """Upper bound shown as '≤ v': round up, so 3.04 prints as 3.1 rather than 3.0."""
+    return "—" if v is None else fmt(math.ceil(v * 10 ** digits) / 10 ** digits, digits)
 
 
 def numbers():
@@ -61,9 +67,8 @@ def numbers():
         n["eq_std_lo"] = min(r["std_ratio_min"] for r in nd)
         n["eq_std_hi"] = max(r["std_ratio_max"] for r in nd)
         od = e["output_distribution"]
-        n["eq_px_total"] = 3 * od["H"] * od["W"]
-        n["eq_px_off"] = round(od["pixel_mean_abs_z_gt3_frac"] * n["eq_px_total"])
-        n["eq_px_chance"] = round(od["expected_gt3_frac_if_identical"] * n["eq_px_total"])
+        n["eq_px_draws"] = od["draws"]
+        n["eq_px_std"] = od["pixel_std_ratio_median"]
 
     ld = load("loader.json")
     if ld:
@@ -92,6 +97,11 @@ def numbers():
         for m in ("off", "ours", "gpu"):
             n[f"t_epoch_{m}"] = 10000 / n[f"t_{m}"] / 60
         n["t_off_max_w"] = max(r["workers"] for r in single if r["pasta_mode"] == "cpu_official")
+        off_max, none_max = pick("cpu_official", n["t_off_max_w"]), pick("none", n["t_off_max_w"])
+        n.update(t_off_max=off_max["img_per_s_global"], t_off_max_stall=100 * off_max["data_wait_frac"])
+        # Busy CPU workers can also slow the training process itself: compare time per step with no PASTA
+        step = lambda r: r["step_s"] / r["batches"]  # noqa: E731
+        n["t_off_max_step"] = 100 * (step(off_max) / step(none_max) - 1) if none_max else None
         n["t_demand"] = max(r["img_per_s_global"] for r in single if r["pasta_mode"] == "none")
         # Compare each PASTA mode with no PASTA at the same worker count: GPU PASTA's worst-case cost,
         # and the fewest workers with which FlashPASTA in CPU workers keeps up (within 5%)
@@ -203,15 +213,20 @@ def build():
                 f"<th>GPU waiting</th><th>{epoch_head}</th></tr>{rows}</table>")
 
     if has_train:
+        if n["t_off_max_stall"] < 5 and n["t_off_max_step"]:  # loader keeps up, but the workers slow each step
+            off_note = (f": {n['t_off_max_w']} workers reach {fmt(n['t_off_max'])} img/s but compete with training for the CPU,"
+                        f" slowing each step by {fmt(n['t_off_max_step'])}%")
+        else:
+            off_note = f", even with {n['t_off_max_w']} workers"
         train_html = f"""
   {res_table("t", "Sim10k epoch")}
-  <p>The official code never keeps up with the GPU's {fmt(n['t_demand'])} img/s, even with {n['t_off_max_w']} workers.
-  FlashPASTA keeps up from {n['t_ours_min_w']} CPU workers; on the GPU, with any number
-  (≤{fmt(n['t_gpu_cost'])}% cost).{hi_note}</p>"""
+  <p>The official code never keeps up with the GPU's {fmt(n['t_demand'])} img/s{off_note}.{hi_note}</p>"""
     else:
         train_html = "<p class='pending'>Training runs in progress.</p>"
 
-    qr_html = f"""<div class="qr"><img src="../figures/qr_code.svg"><div>Code &amp; data</div></div>""" if has_qr else ""
+    # The QR code is also a link, for readers of the PDF
+    qr_html = (f'<div class="qr"><a href="{escape(code_url)}"><img src="../figures/qr_code.svg"></a>'
+               f"<div>Code &amp; data</div></div>") if has_qr else ""
 
     short_gpu = n.get("gpu_name", "").replace("NVIDIA ", "")
     short_cpu = re.sub(r"^AMD Ryzen |^Intel\(R\) ", "", n.get("cpu_name", ""))
@@ -254,7 +269,8 @@ h1 {{ font-size: 80pt; line-height: 1.04; margin: 0 0 6mm; letter-spacing: -0.5p
 .conf b {{ color: #fff; font-size: 38pt; }}
 .qr {{ background: #fff; color: #184f95; border-radius: 3mm; padding: 3mm 3mm 2mm; text-align: center;
        font-size: 20pt; font-weight: 600; }}
-.qr img {{ width: 56mm; height: 56mm; display: block; }}
+.qr a, .qr img {{ display: block; }}
+.qr img {{ width: 56mm; height: 56mm; }}
 main {{ padding: 9mm 30mm 0; }}
 .tiles {{ display: flex; gap: 10mm; margin-bottom: 9mm; }}
 .tile {{ flex: 1; background: #f4f3f0; border-top: 2.5mm solid #2a78d6; border-radius: 0 0 3mm 3mm; padding: 5mm 7mm 6mm; }}
@@ -295,7 +311,6 @@ footer {{ position: absolute; left: 30mm; right: 30mm; bottom: 10mm; padding-top
           font-size: 20pt; color: #52514e; line-height: 1.3; }}
 footer .refs {{ flex: 1; }}
 .nw {{ white-space: nowrap; }}
-footer .link {{ text-align: right; white-space: nowrap; font-size: 22pt; color: #184f95; font-weight: 600; }}
 .pending {{ color: #b45309; }}
 </style></head><body>
 <header>
@@ -337,7 +352,7 @@ footer .link {{ text-align: right; white-space: nowrap; font-size: 22pt; color: 
     <tr><td>Same noise: largest pixel difference (float32)</td><td class="num">{sci(n['eq_max_err'], 1) if 'eq_max_err' in n else '—'}</td></tr>
     <tr><td>8-bit pixels that change (by {fmt(n.get('eq_uint8_max'))} level)</td><td class="num">{100 * n.get('eq_uint8', 0):.3f}%</td></tr>
     <tr><td>Sampled noise spread vs official</td><td class="num">{fmt(n.get('eq_std_lo'), 2)}–{fmt(n.get('eq_std_hi'), 2)}×</td></tr>
-    <tr><td>Pixel means with |z| &gt; 3 (≈{fmt(n.get('eq_px_chance'))} expected by chance)</td><td class="num">{fmt(n.get('eq_px_off'))} / {fmt(n.get('eq_px_total'))}</td></tr>
+    <tr><td>Output pixel spread vs official ({fmt(n.get('eq_px_draws'))} draws, median)</td><td class="num">{fmt(n.get('eq_px_std'), 2)}×</td></tr>
   </table></section>
 </div>
 <div class="col wide">
@@ -352,7 +367,7 @@ footer .link {{ text-align: right; white-space: nowrap; font-size: 22pt; color: 
   <section class="box"><h2>Takeaways</h2><ul>
     <li>FlashPASTA on one GPU is {fmt(n.get('k_speedup'))}× faster than the official code on {n.get('maxp', 32)} CPU cores,
     with the same output up to floating-point rounding.</li>
-    <li>On the GPU it costs ≤{fmt(n.get('t_gpu_cost'))}% of training speed with any number of workers;
+    <li>On the GPU it costs ≤{fmt_max(n.get('t_gpu_cost'))}% of training speed with any number of workers;
     in CPU workers FlashPASTA needs {n.get('t_ours_min_w', '—')} to keep up.</li>
     <li>Restructuring ({fmt(n.get('k_alg'), 1)}× on one core) and the real-FFT identity ({fmt(n.get('k_rfft'), 1)}× on GPU)
     apply to any Fourier-domain augmentation.</li></ul></section>
@@ -360,7 +375,7 @@ footer .link {{ text-align: right; white-space: nowrap; font-size: 22pt; color: 
 <div class="col wide">
   <section><h2>3 · {train_claim}</h2>
   <img class="fig" src="../figures/fig3_train.svg">
-  <p class="caption"><b>Figure 3.</b> YOLO26s, 640 px, batch 16, one RTX A5000, mixed precision; mosaic off so
+  <p class="caption"><b>Figure 3.</b> YOLO26s [3], 640 px, batch 16, one RTX A5000, mixed precision; mosaic off so
   every mode sees identical inputs.</p>
   {train_html}</section>
 {coral_html}
@@ -377,7 +392,6 @@ footer .link {{ text-align: right; white-space: nowrap; font-size: 22pt; color: 
   [4] A. Aldhahri, E. Saif, H. Ali, M. Alsayed, F. Alshareef. Harnessing Computer Vision and Deep Learning to Monitor
   Coral Reef Health. ETASR 15(4), 2025, doi:10.48084/etasr.10324; Marjan dataset, Roboflow Universe,
   <span class="nw">CC BY 4.0</span>.</div>
-  {f'<div class="link">{escape(code_url.removeprefix("https://"))}</div>' if code_url else ""}
 </footer>
 </body></html>"""
     html = html.replace("/*BALANCE*/", balance_css(html))
@@ -413,6 +427,9 @@ def balance_css(html, max_gap_mm=30, bottom_pad_mm=6):
     rules = []
     for i, (col_el, col_box) in enumerate(sorted(cols, key=lambda c: c[1].position_x), start=1):
         secs = [first[id(ch)][1] for ch in col_el if ch.tag == "section" and id(ch) in first]
+        # The page count can't catch this: the body has a fixed height, so a long column runs under the footer
+        overrun_mm = (max(b.position_y + b.margin_height() - b.margin_bottom for b in secs) - footer.position_y) / PX_PER_MM
+        assert overrun_mm <= 0, f"column {i} runs {overrun_mm:.0f} mm into the footer"
         if len(secs) < 2:
             continue
         bottom = max(b.position_y + b.margin_height() for b in secs)

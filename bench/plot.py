@@ -27,6 +27,7 @@ LABEL = {"gpu": "FlashPASTA, on GPU", "cpu_official": "Official, in CPU workers"
 MODE_COLOR = {"gpu": C["gpu"], "cpu_official": C["official"], "cpu_ours": C["ours_cpu"], "none": C["none"]}
 MODES = ["none", "cpu_official", "cpu_ours", "gpu"]
 COL_W = 14.0  # inches, one poster column
+LEGEND_HANDLE = 3.0  # long enough that the dashed no-PASTA line reads as dashed beside the marker
 
 plt.rcParams.update({
     "font.family": "Noto Sans", "font.size": 22, "axes.titlesize": 24, "axes.labelsize": 22,
@@ -36,13 +37,14 @@ plt.rcParams.update({
     "axes.axisbelow": True, "axes.spines.top": False, "axes.spines.right": False,
     "legend.frameon": False, "figure.facecolor": "white", "axes.facecolor": "white",
     "savefig.dpi": 150, "svg.fonttype": "path", "axes.titlelocation": "left", "axes.titlepad": 14,
+    "svg.hashsalt": "flashpasta",  # stable element ids, so regenerated SVGs only differ where the plot does
 })
 
 
 def save(fig, name):
     FIG.mkdir(exist_ok=True)
     for ext in ("svg", "png"):
-        fig.savefig(FIG / f"{name}.{ext}", bbox_inches="tight", pad_inches=0.1)
+        fig.savefig(FIG / f"{name}.{ext}", bbox_inches="tight", pad_inches=0.1, metadata={"Date": None})
     plt.close(fig)
     print("wrote", FIG / f"{name}.svg")
 
@@ -162,7 +164,7 @@ def fig_loader():
     handles, labels = axes[0][0].get_legend_handles_labels()
     fig.legend(handles, labels, loc="upper center", ncol=3 if len(handles) > 4 else 2,
                bbox_to_anchor=(0.5, 1.16), fontsize=18,
-               handlelength=1.6, columnspacing=1.2)
+               handlelength=LEGEND_HANDLE, columnspacing=1.2)
     save(fig, "fig2_loader")
 
 
@@ -190,7 +192,7 @@ def fig_train():
     b.set_title("Data-loader stall")
     handles, labels = a.get_legend_handles_labels()
     fig.legend(handles, labels, loc="upper center", ncol=2, bbox_to_anchor=(0.5, 1.16), fontsize=18,
-               handlelength=1.6, columnspacing=1.2)
+               handlelength=LEGEND_HANDLE, columnspacing=1.2)
     save(fig, "fig3_train")
 
 
