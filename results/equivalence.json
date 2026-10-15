@@ -176,9 +176,9 @@
     "H": 48,
     "W": 64,
     "draws": 2000,
-    "pixel_mean_abs_z_max": 1.0270496606826782,
-    "pixel_mean_abs_z_gt3_frac": 0.0,
-    "pixel_std_ratio_median": 1.0088403224945068,
+    "pixel_mean_abs_z_max": 4.365757465362549,
+    "pixel_mean_abs_z_gt3_frac": 0.0037977430555555555,
+    "pixel_std_ratio_median": 1.0001002550125122,
     "expected_gt3_frac_if_identical": 0.0027
   }
 }
