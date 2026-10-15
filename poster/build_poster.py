@@ -59,6 +59,9 @@ def numbers():
         nd = e["noise_distribution"]
         n["eq_std_lo"] = min(r["std_ratio_min"] for r in nd)
         n["eq_std_hi"] = max(r["std_ratio_max"] for r in nd)
+        od = e["output_distribution"]
+        n["eq_px_total"] = 3 * od["H"] * od["W"]
+        n["eq_px_off"] = round(od["pixel_mean_abs_z_gt3_frac"] * n["eq_px_total"])
 
     ld = load("loader.json")
     if ld:
@@ -142,141 +145,177 @@ def build():
     names_html = ", ".join(f"{escape(x['name'])}{mark(x)}" for x in people)
     affil_html = " · ".join((f"<sup>{i + 1}</sup>" if len(affils) > 1 else "") + escape(af) for i, af in enumerate(affils))
     email_html = " · ".join(escape(x["email"]) for x in people)
+    code_url = a.get("code_url", "")
+    has_qr = code_url and (ROOT / "figures/qr_code.svg").exists()
+    has_example = (ROOT / "figures/example_pasta.jpg").exists()
     has_train = "t_speedup" in n
 
     tiles = [
         (f"{fmt(n.get('k_speedup'))}×", f"faster PASTA on 1 GPU than the official code on {n.get('maxp', 32)} CPU cores"),
         (f"{fmt(n.get('t_off_stall'))}% → {fmt(n.get('t_gpu_stall'), 1)}%" if has_train else "pending",
-         f"of training time the GPU waits for data ({HEADLINE_WORKERS} CPU workers)"),
+         f"of training time the GPU sits waiting for data ({HEADLINE_WORKERS} CPU workers)"),
         (f"{fmt(n.get('t_speedup'), 1)}×" if has_train else "pending",
-         f"faster YOLO training epoch on Sim10k ({HEADLINE_WORKERS} workers)"),
+         f"faster YOLO training on Sim10k with the same {HEADLINE_WORKERS} workers"),
         (sci(n["eq_max_err"]) if "eq_max_err" in n else "—",
-         "largest pixel difference from the official output (same noise)"),
+         "largest pixel difference from the official output, same noise"),
     ]
     tiles_html = "".join(f'<div class="tile"><div class="big">{escape(b)}</div><div class="cap">{escape(c)}</div></div>'
                          for b, c in tiles)
 
+    example_html = f"""
+  <div class="example">
+    <div><img src="../figures/example_original.jpg"><div class="lbl">Sim10k frame [2]</div></div>
+    <div><img src="../figures/example_pasta.jpg"><div class="lbl">After PASTA (α=3, β=0.25, k=2)</div></div>
+  </div>""" if has_example else ""
+
     if has_train:
-        train_text = f"""
-        <p>With {HEADLINE_WORKERS} CPU workers per GPU, a common allocation on shared GPU nodes,
-        the official PASTA keeps the GPU waiting for data <b>{fmt(n['t_off_stall'])}%</b> of the time
-        and training runs at <b>{fmt(n['t_off'])} img/s</b>. On the GPU, PASTA adds
-        {fmt(n['t_gpu_pasta_ms'], 1)} ms per batch, the stall drops to <b>{fmt(n['t_gpu_stall'], 1)}%</b> and training
-        runs at <b>{fmt(n['t_gpu'])} img/s</b>{f" (no PASTA: {fmt(n['t_none'])} img/s)" if n.get('t_none') else ""}.</p>
-        <table>
-          <tr><th></th><th>Official, CPU</th><th>Ours, GPU</th></tr>
-          <tr><td>One Sim10k epoch (10k images)</td><td>{fmt(n['t_epoch_off'], 1)} min</td><td>{fmt(n['t_epoch_gpu'], 1)} min</td></tr>
-          <tr><td>100 epochs (projected)</td><td>{fmt(n['t_100ep_off'], 1)} h</td><td>{fmt(n['t_100ep_gpu'], 1)} h</td></tr>
-        </table>
-        <p>Even with all {n['t_off_best_w']} workers the official version reaches only
-        {fmt(n['t_off_best'])} img/s, below the {fmt(n['t_demand'])} img/s the GPU can train at.
-        The GPU version gets within 10% of that rate with
-        {n['t_gpu_min_w'] if n.get('t_gpu_min_w') else '—'} workers.</p>"""
+        train_html = f"""
+  <table class="res">
+    <tr><th>{HEADLINE_WORKERS} CPU workers, 640 px</th><th class="off">Official, CPU</th><th class="gpu">Ours, GPU</th></tr>
+    <tr><td>Training throughput</td><td>{fmt(n['t_off'])} img/s</td><td><b>{fmt(n['t_gpu'])} img/s</b></td></tr>
+    <tr><td>GPU waiting for data</td><td>{fmt(n['t_off_stall'])}%</td><td><b>{fmt(n['t_gpu_stall'], 1)}%</b></td></tr>
+    <tr><td>One Sim10k epoch (10k images)</td><td>{fmt(n['t_epoch_off'], 1)} min</td><td><b>{fmt(n['t_epoch_gpu'], 1)} min</b></td></tr>
+    <tr><td>100 epochs (projected)</td><td>{fmt(n['t_100ep_off'], 1)} h</td><td><b>{fmt(n['t_100ep_gpu'], 1)} h</b></td></tr>
+  </table>
+  <p>PASTA on the GPU costs {fmt(n['t_gpu_pasta_ms'], 1)} ms per batch. Even with {n['t_off_best_w']} workers the
+  official version reaches only {fmt(n['t_off_best'])} img/s, while the GPU trains at up to
+  {fmt(n['t_demand'])} img/s; the GPU version gets within 10% of that with
+  {n['t_gpu_min_w'] if n.get('t_gpu_min_w') else '—'} workers.</p>"""
     else:
-        train_text = "<p class='pending'>Training runs in progress.</p>"
+        train_html = "<p class='pending'>Training runs in progress.</p>"
 
-    takeaways = f"""
-      <li>Moving PASTA from CPU workers to the GPU makes it {fmt(n.get('k_speedup'))}× faster than 32 CPU cores,
-      with output identical to the official code up to floating-point rounding.</li>
-      <li>The augmentation no longer consumes the CPU-core budget, so the same node can feed its GPU
-      with a few workers.</li>
-      <li>Restructuring alone ({fmt(n.get('k_alg'), 1)}× on one CPU core) and the real-FFT identity
-      ({fmt(n.get('k_rfft'), 1)}× on GPU) carry over to any Fourier-domain augmentation.</li>"""
+    qr_html = f"""<div class="qr"><img src="../figures/qr_code.svg"><div>Code &amp; data</div></div>""" if has_qr else ""
 
-    html = f"""<!doctype html><html><head><meta charset="utf-8"><title>GPU-accelerated PASTA</title>
+    html = f"""<!doctype html><html><head><meta charset="utf-8"><title>FlashPASTA poster</title>
 <style>
 @page {{ size: 1189mm 841mm; margin: 0; }}
 * {{ box-sizing: border-box; }}
-body {{ margin: 0; width: 1189mm; height: 841mm; padding: 24mm 30mm 20mm; font-family: 'Noto Sans', sans-serif;
-       font-size: 27pt; line-height: 1.32; color: #0b0b0b; background: #fff; }}
-header {{ display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 3mm solid #2a78d6;
-         padding-bottom: 8mm; }}
-h1 {{ font-size: 80pt; line-height: 1.05; margin: 0 0 6mm; letter-spacing: -0.5pt; }}
-.authors {{ font-size: 36pt; }} .affil {{ font-size: 30pt; color: #52514e; }}
-header > div:first-child {{ flex: 1; }}
-.conf {{ flex: 0 0 230mm; text-align: right; font-size: 30pt; color: #52514e; }} .conf b {{ color: #0b0b0b; }}
-.tiles {{ display: flex; gap: 10mm; margin: 9mm 0 8mm; }}
-.tile {{ flex: 1; background: #f4f3f0; border-radius: 4mm; padding: 6mm 8mm; }}
-.tile .big {{ font-size: 64pt; font-weight: 700; color: #1c5cab; line-height: 1.05; }}
-.tile .cap {{ font-size: 25pt; color: #52514e; }}
-.cols {{ display: flex; gap: 16mm; }}
-.col {{ flex: 1; }} .col.wide {{ flex: 1.12; }}
-h2 {{ font-size: 40pt; color: #1c5cab; margin: 0 0 3mm; padding-bottom: 2mm; border-bottom: 0.8mm solid #d6d5d0; }}
-section {{ margin-bottom: 8mm; }}
-p {{ margin: 0 0 4mm; }} ul, ol {{ margin: 0 0 4mm; padding-left: 10mm; }} li {{ margin-bottom: 2mm; }}
-img.fig {{ width: 100%; display: block; margin: 2mm 0 2mm; }}
-.caption {{ font-size: 24pt; color: #52514e; }}
-table {{ border-collapse: collapse; width: 100%; margin: 2mm 0 5mm; font-size: 26pt; }}
-th, td {{ text-align: left; padding: 2mm 3mm; border-bottom: 0.5mm solid #d6d5d0; }}
+html, body {{ margin: 0; }}
+body {{ width: 1189mm; height: 841mm; position: relative; overflow: hidden; font-family: 'Noto Sans', sans-serif;
+       font-size: 26pt; line-height: 1.3; color: #0b0b0b; background: #fff; }}
+header {{ background: #184f95; color: #fff; padding: 14mm 30mm 12mm; position: relative; }}
+header .titles {{ margin-right: 330mm; }}
+header .right {{ position: absolute; right: 30mm; top: 0; bottom: 0; display: flex; align-items: center; gap: 12mm; }}
+h1 {{ font-size: 80pt; line-height: 1.04; margin: 0 0 6mm; letter-spacing: -0.5pt; font-weight: 700; }}
+.authors {{ font-size: 36pt; font-weight: 600; }}
+.affil {{ font-size: 27pt; color: #cde2fb; }}
+.conf {{ width: 240mm; text-align: right; font-size: 30pt; color: #cde2fb; line-height: 1.35; white-space: nowrap; }}
+.conf b {{ color: #fff; font-size: 38pt; }}
+.qr {{ background: #fff; color: #184f95; border-radius: 3mm; padding: 3mm 3mm 2mm; text-align: center;
+       font-size: 20pt; font-weight: 600; }}
+.qr img {{ width: 56mm; height: 56mm; display: block; }}
+main {{ padding: 9mm 30mm 0; }}
+.tiles {{ display: flex; gap: 10mm; margin-bottom: 9mm; }}
+.tile {{ flex: 1; background: #f4f3f0; border-top: 2.5mm solid #2a78d6; border-radius: 0 0 3mm 3mm; padding: 5mm 7mm 6mm; }}
+.tile .big {{ font-size: 62pt; font-weight: 700; color: #184f95; line-height: 1.05; }}
+.tile .cap {{ font-size: 24pt; color: #52514e; line-height: 1.25; }}
+.cols {{ display: flex; gap: 16mm; align-items: flex-start; }}
+.col {{ flex: 1; }}
+section {{ margin-bottom: 9mm; }}
+.col.wide {{ flex: 1.08; }}
+h2 {{ font-size: 38pt; color: #184f95; margin: 0 0 4mm; padding-left: 5mm; border-left: 3mm solid #2a78d6;
+      line-height: 1.15; }}
+p {{ margin: 0 0 3.5mm; }}
+ul {{ margin: 0 0 3mm; padding-left: 9mm; }} li {{ margin-bottom: 2mm; }}
+img.fig {{ width: 100%; display: block; margin: 1mm 0 2mm; }}
+.caption {{ font-size: 24pt; color: #52514e; line-height: 1.25; margin: 0; }}
+.caption b {{ color: #0b0b0b; }}
+.example {{ display: flex; gap: 4mm; margin: 2mm 0 4mm; }}
+.example > div {{ flex: 1; }}
+.example img {{ width: 100%; display: block; border-radius: 2mm; }}
+.example .lbl {{ font-size: 22pt; color: #52514e; margin-top: 1mm; }}
+svg.pipe {{ width: 100%; display: block; margin: 1mm 0 4mm; }}
+.eq {{ font-family: 'DejaVu Sans Mono', monospace; font-size: 23pt; background: #f4f3f0; padding: 3mm 4mm;
+       border-radius: 2mm; margin: 2mm 0 0; }}
+table {{ border-collapse: collapse; width: 100%; font-size: 25pt; margin: 2mm 0 4mm; }}
+th, td {{ text-align: left; padding: 2mm 3mm; border-bottom: 0.5mm solid #d6d5d0; vertical-align: top; }}
 th {{ color: #52514e; font-weight: 600; }}
-.eq {{ font-family: 'DejaVu Sans Mono', monospace; font-size: 24pt; background: #f4f3f0; padding: 3mm 4mm;
-       border-radius: 2mm; margin: 2mm 0 4mm; }}
-.refs {{ font-size: 21pt; color: #52514e; }}
+td.num {{ text-align: right; font-weight: 700; color: #184f95; white-space: nowrap; }}
+table.res th.off {{ color: #c4501f; }} table.res th.gpu {{ color: #1c5cab; }}
+.box {{ background: #eaf2fc; border-radius: 3mm; padding: 6mm 7mm 3mm; }}
+.box h2 {{ border-left: none; padding-left: 0; }}
+footer {{ position: absolute; left: 30mm; right: 30mm; bottom: 10mm; padding-top: 5mm;
+          border-top: 0.6mm solid #d6d5d0; display: flex; gap: 20mm;
+          font-size: 20pt; color: #52514e; line-height: 1.3; }}
+footer .refs {{ flex: 1; }}
+footer .link {{ text-align: right; white-space: nowrap; font-size: 22pt; color: #184f95; font-weight: 600; }}
 .pending {{ color: #b45309; }}
 </style></head><body>
 <header>
-  <div>
+  <div class="titles">
     <h1>PASTA at GPU speed: taking Fourier augmentation<br>off the CPU critical path</h1>
     <div class="authors">{names_html}</div>
     <div class="affil">{affil_html}</div>
     <div class="affil">{email_html}</div>
   </div>
-  <div class="conf"><b>Saudi HPC/AI 2026</b><br>KAUST, 26–28 October<br>Methods that improve<br>computational efficiency</div>
+  <div class="right">
+    <div class="conf"><b>Saudi HPC/AI 2026</b><br>KAUST · 26–28 October<br>Methods that improve<br>computational efficiency</div>
+    {qr_html}
+  </div>
 </header>
+<main>
 <div class="tiles">{tiles_html}</div>
 <div class="cols">
 <div class="col">
-  <section><h2>Problem</h2>
-  <p>Synthetic images from games and simulators come with free labels, but detectors trained on them
-  lose accuracy on real photos. <b>PASTA</b> [1] narrows this gap by randomly perturbing each image's
-  Fourier amplitude spectrum, more strongly at high frequencies.</p>
-  <p>The official code runs inside CPU data-loader workers, one image at a time: two full FFTs in
-  float64 and a frequency mask rebuilt on every call. At Sim10k's 1914×1052 that is
-  <b>{fmt(n.get('k_off1'), 1)} images/s per CPU core</b>. At 640 px a worker that decodes and resizes
-  {fmt(n.get('ld_decode1'))} images/s drops to {fmt(n.get('ld_off1'), 1)} with PASTA.</p></section>
-  <section><h2>Approach</h2>
-  {PIPELINE_SVG}
-  <ol>
-    <li><b>Batched on the GPU</b>: one cuFFT call for the whole batch, after it reaches the GPU.</li>
-    <li><b>Cached mask</b>: the per-frequency noise level is built once per image size.</li>
-    <li><b>No amplitude/phase split</b>: |F|·ε·e<sup>iφ</sup> = F·ε, so abs, angle and exp are skipped.</li>
-    <li><b>Real FFT</b>: the official code keeps only the real part of the inverse FFT, which equals</li>
-  </ol>
-  <div class="eq">Re IFFT(F·ε) = IRFFT( F · (ε(f) + ε(−f)) / 2 )</div>
-  <p>so half the spectrum and half the random numbers suffice, with noise drawn at the matching variance.</p></section>
-  <section><h2>Correctness</h2>
-  <p>Fed the same random draw as the official code, our output differs by at most
-  <b>{sci(n['eq_max_err'], 1)}</b> (float32 GPU vs official); after rounding to 8-bit, at most
-  {100 * n.get('eq_uint8', 0):.3f}% of pixels change, by {fmt(n.get('eq_uint8_max'))} level.
-  With our own sampling, per-frequency noise spread matches within
-  {fmt(n.get('eq_std_lo'), 2)}–{fmt(n.get('eq_std_hi'), 2)}× and per-pixel output statistics match.</p></section>
+  <section><h2>The problem</h2>
+  <p>Synthetic frames come with free labels, but detectors trained on them lose accuracy on real photos.
+  <b>PASTA</b> [1] narrows the gap by randomly perturbing each image's Fourier amplitude spectrum,
+  more strongly at high frequencies.</p>
+  {example_html}
+  <p>The official code runs inside CPU data-loader workers, one image at a time, with float64 FFTs and the
+  noise mask rebuilt on every call: <b>{fmt(n.get('k_off1'), 1)} images/s per core</b> at 1914×1052.
+  At 640 px it cuts a worker from {fmt(n.get('ld_decode1'))} to {fmt(n.get('ld_off1'), 1)} images/s.</p></section>
+  <section><h2>Our approach</h2>
+  {PIPELINE_SVG.replace("<svg ", '<svg class="pipe" ', 1)}
+  <ul>
+    <li><b>Batched cuFFT on the GPU</b>, once the batch has been transferred</li>
+    <li><b>Noise mask cached</b> per image size</li>
+    <li><b>F·ε instead of |F|·ε·e<sup>iφ</sup></b>: no abs, angle or exp</li>
+    <li><b>Real FFT</b>: the official code keeps only the real part, and</li>
+  </ul>
+  <div class="eq">Re IFFT(F·ε) = IRFFT(F·(ε(f)+ε(−f))/2)</div></section>
+  <section><h2>Same output as the official code</h2>
+  <table>
+    <tr><td>Same noise: largest pixel difference (float32)</td><td class="num">{sci(n['eq_max_err'], 1) if 'eq_max_err' in n else '—'}</td></tr>
+    <tr><td>8-bit pixels that change (by {fmt(n.get('eq_uint8_max'))} level)</td><td class="num">{100 * n.get('eq_uint8', 0):.3f}%</td></tr>
+    <tr><td>Sampled noise spread vs official</td><td class="num">{fmt(n.get('eq_std_lo'), 2)}–{fmt(n.get('eq_std_hi'), 2)}×</td></tr>
+    <tr><td>Pixel means that differ (|z| &gt; 3)</td><td class="num">{fmt(n.get('eq_px_off'))} / {fmt(n.get('eq_px_total'))}</td></tr>
+  </table></section>
 </div>
 <div class="col wide">
-  <section><h2>1 · PASTA alone</h2>
+  <section><h2>1 · The augmentation alone</h2>
   <img class="fig" src="../figures/fig1_kernel.svg">
-  <p class="caption">Images/s of the augmentation only. {escape(n.get('gpu_name', ''))} vs
-  {escape(n.get('cpu_name', ''))}; CPU numbers use single-threaded processes, like data-loader workers.
-  Speed-ups are relative to the official code on {n.get('maxp', 32)} cores.</p></section>
-  <section><h2>2 · Input pipeline</h2>
+  <p class="caption"><b>Figure 1.</b> Images/s of PASTA only. {escape(n.get('gpu_name', ''))} vs
+  {escape(n.get('cpu_name', ''))}; CPU runs use single-threaded processes, as in data-loader workers.
+  Speed-ups vs the official code on {n.get('maxp', 32)} cores.</p></section>
+  <section><h2>2 · Feeding the GPU</h2>
   <img class="fig" src="../figures/fig2_loader.svg">
-  <p class="caption">Images/s a PyTorch DataLoader delivers on Sim10k (JPEG decode → letterbox → PASTA),
-  by number of CPU workers. Dotted line: rate at which YOLO26s trains at 640 px when data is never late.</p></section>
+  <p class="caption"><b>Figure 2.</b> Images/s a PyTorch DataLoader delivers on Sim10k (JPEG decode →
+  letterbox → PASTA) by number of CPU workers. Dotted line: the rate YOLO26s trains at when data is never late.</p></section>
 </div>
 <div class="col wide">
   <section><h2>3 · YOLO training on Sim10k</h2>
   <img class="fig" src="../figures/fig3_train.svg">
-  <p class="caption">YOLO26s, 640 px, batch 16, one RTX A5000, mixed precision; mosaic off so all modes see
-  identical inputs. Steady-state epoch on 2,000 Sim10k images.</p>
-  {train_text}</section>
-  <section><h2>Takeaways</h2><ul>{takeaways}</ul></section>
-  <section class="refs">
-  [1] Chattopadhyay, Sarangmath, Vijaykumar, Hoffman. PASTA: Proportional Amplitude Spectrum Training
+  <p class="caption"><b>Figure 3.</b> YOLO26s, 640 px, batch 16, one RTX A5000, mixed precision, mosaic off
+  so all modes see identical inputs; steady-state epoch on 2,000 images.</p>
+  {train_html}</section>
+  <section class="box"><h2>Takeaways</h2><ul>
+    <li>On the GPU, PASTA is {fmt(n.get('k_speedup'))}× faster than the official code on {n.get('maxp', 32)} CPU cores,
+    with the same output up to floating-point rounding.</li>
+    <li>It no longer eats the CPU-core budget, so a node feeds its GPU with a few workers.</li>
+    <li>Restructuring ({fmt(n.get('k_alg'), 1)}× on one core) and the real-FFT identity ({fmt(n.get('k_rfft'), 1)}× on GPU)
+    apply to any Fourier-domain augmentation.</li></ul></section>
+</div>
+</div>
+</main>
+<footer>
+  <div class="refs">
+  [1] P. Chattopadhyay, K. Sarangmath, V. Vijaykumar, J. Hoffman. PASTA: Proportional Amplitude Spectrum Training
   Augmentation for Syn-to-Real Domain Generalization. ICCV 2023.
-  [2] Johnson-Roberson et al. Driving in the Matrix. ICRA 2017; Sim10k via UMich Deep Blue,
-  doi:10.7302/e1f1-3d97 (CC BY-NC 4.0). [3] Ultralytics YOLO26.
-  {f"Code: {escape(a['code_url'])}" if a.get('code_url') else ""}</section>
-</div>
-</div>
+  [2] M. Johnson-Roberson et al. Driving in the Matrix. ICRA 2017. Sim10k, doi:10.7302/e1f1-3d97, CC BY-NC 4.0.
+  [3] Ultralytics YOLO26.</div>
+  {f'<div class="link">{escape(code_url.removeprefix("https://"))}</div>' if code_url else ""}
+</footer>
 </body></html>"""
     out = POSTER / "poster.html"
     out.write_text(html)
