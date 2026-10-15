@@ -1,0 +1,9 @@
+torch>=2.4
+torchvision>=0.19
+numpy
+pillow
+opencv-python
+ultralytics>=8.4
+nvidia-ml-py
+matplotlib
+weasyprint

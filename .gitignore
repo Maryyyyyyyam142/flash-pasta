@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Datasets and model weights (download separately, see README)
+data/raw/
+data/sim10k/
+data/*.yaml
+weights/
+*.pt
+
+# Run artefacts
+runs/
+logs/
+logs_run_all.txt
+results/smoke/
+
+# Generated previews (SVG figures and the PDF poster are tracked)
+figures/*.png
+poster/poster.html
