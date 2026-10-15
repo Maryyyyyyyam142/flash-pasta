@@ -37,8 +37,23 @@ Sim10k resolution (1914×1052):
 | FlashPASTA, 32 CPU cores | 116 |
 | FlashPASTA, 1 GPU | 682 |
 
-End-to-end data-loader and YOLO training results on Sim10k are in `results/` and on the
-poster (`poster/poster.pdf`).
+### YOLO training on Sim10k
+
+YOLO26s, batch 16 (8 at 1280 px), one RTX A5000, mixed precision, mosaic off so every mode
+sees identical inputs. Steady-state epoch; "GPU waiting" is the share of the training loop
+spent waiting for the next batch.
+
+| Setup | Official, CPU workers | FlashPASTA, GPU | Speed-up |
+|---|---|---|---|
+| 640 px, 8 workers | 41.6 img/s, GPU waiting 77% | 173.8 img/s, GPU waiting 0.2% | 4.2× |
+| 640 px, 16 workers | 78.5 img/s, GPU waiting 55% | 173.8 img/s, GPU waiting 0.3% | 2.2× |
+| 1280 px, 8 workers | 7.1 img/s, GPU waiting 85% | 46.0 img/s, GPU waiting 0.1% | 6.4× |
+
+Without PASTA the same model trains at about 176 img/s (640 px) and 48 img/s (1280 px), so
+FlashPASTA costs about 1–4% of training throughput, while the official implementation never
+reaches the GPU's rate even with all 32 cores.
+
+All raw numbers are in `results/` and on the poster (`poster/poster.pdf`).
 
 ## Usage
 
@@ -68,7 +83,9 @@ converts back.
 | `bench/plot.py`, `poster/build_poster.py` | Figures and the A0 poster, generated from `results/` |
 | `data/prepare_sim10k.py` | Sim10k (Pascal VOC) to YOLO format, car class only |
 | `data/make_standin.py` | Same-size placeholder images for smoke-testing the pipeline |
-| `run_all.sh` | Full benchmark: loader sweep and training sweep |
+| `run_all.sh` | Sim10k benchmark: loader sweep and training sweep |
+| `run_marjan.sh` | Training-throughput sweep on the Marjan coral dataset |
+| `poster/make_assets.py` | Example images and the QR code used on the poster |
 
 ## Reproducing
 
@@ -85,9 +102,15 @@ python bench/bench_kernel.py --device cuda:0
 #    https://doi.org/10.7302/e1f1-3d97 and extract them to data/raw
 python data/prepare_sim10k.py --src data/raw --dst data/sim10k
 
-# 4. Loader and training sweeps (GPU=<physical id>), then figures and poster
+# 4. Loader and training sweeps (GPU=<physical id>)
 GPU=0 ./run_all.sh
-python bench/plot.py && python poster/build_poster.py
+
+# 5. Optional: Marjan coral dataset (YOLO export from Roboflow Universe,
+#    maha-bil6y/marjan-detection v3) extracted to data/marjan, with data/marjan.yaml
+GPU=0 ./run_marjan.sh
+
+# 6. Figures and poster
+python bench/plot.py && python poster/make_assets.py && python poster/build_poster.py
 ```
 
 Run the benchmarks on an otherwise idle GPU and CPU; other jobs on the same machine skew
@@ -101,6 +124,9 @@ the CPU-worker numbers.
    Human-Generated Annotations for Real World Tasks?* ICRA 2017. Sim10k dataset,
    doi:10.7302/e1f1-3d97 (CC BY-NC 4.0).
 3. Ultralytics YOLO26.
+4. A. Aldhahri, E. Saif, H. Ali, M. Alsayed, F. Alshareef. *Harnessing Computer Vision and Deep
+   Learning to Monitor Coral Reef Health.* ETASR 15(4), 2025, doi:10.48084/etasr.10324.
+   Marjan dataset, Roboflow Universe (CC BY 4.0).
 
 `pasta_gpu/reference_official.py` is copied from the authors' repository under the MIT
 License, Copyright (c) 2024 Prithvijit Chattopadhyay.
