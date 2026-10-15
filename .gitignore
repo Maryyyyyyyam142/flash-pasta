@@ -14,7 +14,7 @@ weights/
 # Run artefacts
 runs/
 logs/
-logs_run_all.txt
+logs_run_*.txt
 results/smoke/
 
 # Generated previews (SVG figures and the PDF poster are tracked)

@@ -1,0 +1,47 @@
+{
+  "meta": {
+    "pasta_mode": "gpu",
+    "workers": 8,
+    "batch": 16,
+    "imgsz": 640,
+    "model": "weights/yolo26s.pt",
+    "device": "2",
+    "world_size": 1,
+    "fraction": 0.25,
+    "gpu": "NVIDIA RTX A5000",
+    "gpu_physical_ids": [
+      2
+    ],
+    "alpha": "3.0",
+    "beta": "0.25",
+    "k": "2"
+  },
+  "epochs": [
+    {
+      "epoch": 1,
+      "train_loop_s": 21.24706463003531,
+      "data_wait_s": 0.6823864206671715,
+      "step_s": 20.56467820936814,
+      "data_wait_frac": 0.032116738596565254,
+      "batches": 149,
+      "img_per_s_global": 112.20373456340533,
+      "gpu_pasta_s_rank0": 0.43430675041675565,
+      "gpu_util_mean": [
+        52.76777251184834
+      ]
+    },
+    {
+      "epoch": 2,
+      "train_loop_s": 14.098340770229697,
+      "data_wait_s": 0.03302589198574424,
+      "step_s": 14.065314878243953,
+      "data_wait_frac": 0.002342537503099818,
+      "batches": 149,
+      "img_per_s_global": 169.09791292845583,
+      "gpu_pasta_s_rank0": 0.34419603329896925,
+      "gpu_util_mean": [
+        78.47857142857143
+      ]
+    }
+  ]
+}

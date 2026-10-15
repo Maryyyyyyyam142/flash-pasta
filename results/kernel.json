@@ -1,0 +1,589 @@
+{
+  "meta": {
+    "gpu": "NVIDIA RTX A5000",
+    "cpu": "AMD Ryzen Threadripper PRO 3975WX 32-Cores",
+    "cpu_count": 64,
+    "torch": "2.13.0+cu130",
+    "alpha": 3.0,
+    "beta": 0.25,
+    "k": 2
+  },
+  "rows": [
+    {
+      "res": "640x640",
+      "H": 640,
+      "W": 640,
+      "variant": "official_cpu",
+      "cpu_procs": 1,
+      "batch": 1,
+      "img_per_s": 5.679119435195119
+    },
+    {
+      "res": "640x640",
+      "H": 640,
+      "W": 640,
+      "variant": "official_cpu",
+      "cpu_procs": 4,
+      "batch": 1,
+      "img_per_s": 22.053007431217644
+    },
+    {
+      "res": "640x640",
+      "H": 640,
+      "W": 640,
+      "variant": "official_cpu",
+      "cpu_procs": 8,
+      "batch": 1,
+      "img_per_s": 43.12263006757959
+    },
+    {
+      "res": "640x640",
+      "H": 640,
+      "W": 640,
+      "variant": "official_cpu",
+      "cpu_procs": 16,
+      "batch": 1,
+      "img_per_s": 84.32810079196845
+    },
+    {
+      "res": "640x640",
+      "H": 640,
+      "W": 640,
+      "variant": "official_cpu",
+      "cpu_procs": 32,
+      "batch": 1,
+      "img_per_s": 123.12242307319887
+    },
+    {
+      "res": "640x640",
+      "H": 640,
+      "W": 640,
+      "variant": "ours_cpu",
+      "cpu_procs": 1,
+      "batch": 1,
+      "img_per_s": 43.59763836849507
+    },
+    {
+      "res": "640x640",
+      "H": 640,
+      "W": 640,
+      "variant": "ours_cpu",
+      "cpu_procs": 4,
+      "batch": 1,
+      "img_per_s": 198.97931497889462
+    },
+    {
+      "res": "640x640",
+      "H": 640,
+      "W": 640,
+      "variant": "ours_cpu",
+      "cpu_procs": 8,
+      "batch": 1,
+      "img_per_s": 381.8166013720833
+    },
+    {
+      "res": "640x640",
+      "H": 640,
+      "W": 640,
+      "variant": "ours_cpu",
+      "cpu_procs": 16,
+      "batch": 1,
+      "img_per_s": 693.9786503396294
+    },
+    {
+      "res": "640x640",
+      "H": 640,
+      "W": 640,
+      "variant": "ours_cpu",
+      "cpu_procs": 32,
+      "batch": 1,
+      "img_per_s": 917.2337867173434
+    },
+    {
+      "res": "640x640",
+      "H": 640,
+      "W": 640,
+      "variant": "ours_gpu_fft2",
+      "batch": 1,
+      "img_per_s": 3412.048927936112,
+      "peak_mem_gib": 0.029001235961914062
+    },
+    {
+      "res": "640x640",
+      "H": 640,
+      "W": 640,
+      "variant": "ours_gpu_fft2",
+      "batch": 8,
+      "img_per_s": 3627.1751441978677,
+      "peak_mem_gib": 0.22370338439941406
+    },
+    {
+      "res": "640x640",
+      "H": 640,
+      "W": 640,
+      "variant": "ours_gpu_fft2",
+      "batch": 32,
+      "img_per_s": 3669.491492059854,
+      "peak_mem_gib": 0.8804416656494141
+    },
+    {
+      "res": "640x640",
+      "H": 640,
+      "W": 640,
+      "variant": "ours_gpu_rfft2",
+      "batch": 1,
+      "img_per_s": 4053.301320565335,
+      "peak_mem_gib": 0.14801979064941406
+    },
+    {
+      "res": "640x640",
+      "H": 640,
+      "W": 640,
+      "variant": "ours_gpu_rfft2",
+      "batch": 8,
+      "img_per_s": 6713.615242906093,
+      "peak_mem_gib": 0.1687331199645996
+    },
+    {
+      "res": "640x640",
+      "H": 640,
+      "W": 640,
+      "variant": "ours_gpu_rfft2",
+      "batch": 32,
+      "img_per_s": 7007.512049205519,
+      "peak_mem_gib": 0.6633734703063965
+    },
+    {
+      "res": "1280x1280",
+      "H": 1280,
+      "W": 1280,
+      "variant": "official_cpu",
+      "cpu_procs": 1,
+      "batch": 1,
+      "img_per_s": 1.1041730067082431
+    },
+    {
+      "res": "1280x1280",
+      "H": 1280,
+      "W": 1280,
+      "variant": "official_cpu",
+      "cpu_procs": 4,
+      "batch": 1,
+      "img_per_s": 4.238843230490314
+    },
+    {
+      "res": "1280x1280",
+      "H": 1280,
+      "W": 1280,
+      "variant": "official_cpu",
+      "cpu_procs": 8,
+      "batch": 1,
+      "img_per_s": 8.199154054528416
+    },
+    {
+      "res": "1280x1280",
+      "H": 1280,
+      "W": 1280,
+      "variant": "official_cpu",
+      "cpu_procs": 16,
+      "batch": 1,
+      "img_per_s": 14.699863691805751
+    },
+    {
+      "res": "1280x1280",
+      "H": 1280,
+      "W": 1280,
+      "variant": "official_cpu",
+      "cpu_procs": 32,
+      "batch": 1,
+      "img_per_s": 20.25185726391956
+    },
+    {
+      "res": "1280x1280",
+      "H": 1280,
+      "W": 1280,
+      "variant": "ours_cpu",
+      "cpu_procs": 1,
+      "batch": 1,
+      "img_per_s": 10.02563110617298
+    },
+    {
+      "res": "1280x1280",
+      "H": 1280,
+      "W": 1280,
+      "variant": "ours_cpu",
+      "cpu_procs": 4,
+      "batch": 1,
+      "img_per_s": 37.275997085281624
+    },
+    {
+      "res": "1280x1280",
+      "H": 1280,
+      "W": 1280,
+      "variant": "ours_cpu",
+      "cpu_procs": 8,
+      "batch": 1,
+      "img_per_s": 71.44565665909963
+    },
+    {
+      "res": "1280x1280",
+      "H": 1280,
+      "W": 1280,
+      "variant": "ours_cpu",
+      "cpu_procs": 16,
+      "batch": 1,
+      "img_per_s": 126.65437953290797
+    },
+    {
+      "res": "1280x1280",
+      "H": 1280,
+      "W": 1280,
+      "variant": "ours_cpu",
+      "cpu_procs": 32,
+      "batch": 1,
+      "img_per_s": 173.60065097467623
+    },
+    {
+      "res": "1280x1280",
+      "H": 1280,
+      "W": 1280,
+      "variant": "ours_gpu_fft2",
+      "batch": 1,
+      "img_per_s": 811.8806422969918,
+      "peak_mem_gib": 0.14878606796264648
+    },
+    {
+      "res": "1280x1280",
+      "H": 1280,
+      "W": 1280,
+      "variant": "ours_gpu_fft2",
+      "batch": 8,
+      "img_per_s": 832.149844365133,
+      "peak_mem_gib": 0.8850288391113281
+    },
+    {
+      "res": "1280x1280",
+      "H": 1280,
+      "W": 1280,
+      "variant": "ours_gpu_fft2",
+      "batch": 32,
+      "img_per_s": 838.0353017064072,
+      "peak_mem_gib": 3.521747589111328
+    },
+    {
+      "res": "1280x1280",
+      "H": 1280,
+      "W": 1280,
+      "variant": "ours_gpu_rfft2",
+      "batch": 1,
+      "img_per_s": 1217.3250000116093,
+      "peak_mem_gib": 0.5920600891113281
+    },
+    {
+      "res": "1280x1280",
+      "H": 1280,
+      "W": 1280,
+      "variant": "ours_gpu_rfft2",
+      "batch": 8,
+      "img_per_s": 1349.5093984768873,
+      "peak_mem_gib": 0.8162789344787598
+    },
+    {
+      "res": "1280x1280",
+      "H": 1280,
+      "W": 1280,
+      "variant": "ours_gpu_rfft2",
+      "batch": 32,
+      "img_per_s": 1362.7959244373058,
+      "peak_mem_gib": 3.2341256141662598
+    },
+    {
+      "res": "sim10k_1052x1914",
+      "H": 1052,
+      "W": 1914,
+      "variant": "official_cpu",
+      "cpu_procs": 1,
+      "batch": 1,
+      "img_per_s": 0.7244508530374021
+    },
+    {
+      "res": "sim10k_1052x1914",
+      "H": 1052,
+      "W": 1914,
+      "variant": "official_cpu",
+      "cpu_procs": 4,
+      "batch": 1,
+      "img_per_s": 2.7834522791274847
+    },
+    {
+      "res": "sim10k_1052x1914",
+      "H": 1052,
+      "W": 1914,
+      "variant": "official_cpu",
+      "cpu_procs": 8,
+      "batch": 1,
+      "img_per_s": 5.445990563231019
+    },
+    {
+      "res": "sim10k_1052x1914",
+      "H": 1052,
+      "W": 1914,
+      "variant": "official_cpu",
+      "cpu_procs": 16,
+      "batch": 1,
+      "img_per_s": 10.174493162435292
+    },
+    {
+      "res": "sim10k_1052x1914",
+      "H": 1052,
+      "W": 1914,
+      "variant": "official_cpu",
+      "cpu_procs": 32,
+      "batch": 1,
+      "img_per_s": 16.094521078890082
+    },
+    {
+      "res": "sim10k_1052x1914",
+      "H": 1052,
+      "W": 1914,
+      "variant": "ours_cpu",
+      "cpu_procs": 1,
+      "batch": 1,
+      "img_per_s": 4.661636784985856
+    },
+    {
+      "res": "sim10k_1052x1914",
+      "H": 1052,
+      "W": 1914,
+      "variant": "ours_cpu",
+      "cpu_procs": 4,
+      "batch": 1,
+      "img_per_s": 17.72584179973101
+    },
+    {
+      "res": "sim10k_1052x1914",
+      "H": 1052,
+      "W": 1914,
+      "variant": "ours_cpu",
+      "cpu_procs": 8,
+      "batch": 1,
+      "img_per_s": 34.61378916663773
+    },
+    {
+      "res": "sim10k_1052x1914",
+      "H": 1052,
+      "W": 1914,
+      "variant": "ours_cpu",
+      "cpu_procs": 16,
+      "batch": 1,
+      "img_per_s": 67.10296463446242
+    },
+    {
+      "res": "sim10k_1052x1914",
+      "H": 1052,
+      "W": 1914,
+      "variant": "ours_cpu",
+      "cpu_procs": 32,
+      "batch": 1,
+      "img_per_s": 116.05056870052593
+    },
+    {
+      "res": "sim10k_1052x1914",
+      "H": 1052,
+      "W": 1914,
+      "variant": "ours_gpu_fft2",
+      "batch": 1,
+      "img_per_s": 482.70023702845765,
+      "peak_mem_gib": 0.5951180458068848
+    },
+    {
+      "res": "sim10k_1052x1914",
+      "H": 1052,
+      "W": 1914,
+      "variant": "ours_gpu_fft2",
+      "batch": 8,
+      "img_per_s": 488.62388045207183,
+      "peak_mem_gib": 1.0876646041870117
+    },
+    {
+      "res": "sim10k_1052x1914",
+      "H": 1052,
+      "W": 1914,
+      "variant": "ours_gpu_fft2",
+      "batch": 32,
+      "img_per_s": 484.081855378736,
+      "peak_mem_gib": 4.328085899353027
+    },
+    {
+      "res": "sim10k_1052x1914",
+      "H": 1052,
+      "W": 1914,
+      "variant": "ours_gpu_rfft2",
+      "batch": 1,
+      "img_per_s": 657.6960541724136,
+      "peak_mem_gib": 0.7276172637939453
+    },
+    {
+      "res": "sim10k_1052x1914",
+      "H": 1052,
+      "W": 1914,
+      "variant": "ours_gpu_rfft2",
+      "batch": 8,
+      "img_per_s": 681.4692595152957,
+      "peak_mem_gib": 1.0020675659179688
+    },
+    {
+      "res": "sim10k_1052x1914",
+      "H": 1052,
+      "W": 1914,
+      "variant": "ours_gpu_rfft2",
+      "batch": 32,
+      "img_per_s": 682.1594881930232,
+      "peak_mem_gib": 3.974428653717041
+    },
+    {
+      "res": "4k_2160x3840",
+      "H": 2160,
+      "W": 3840,
+      "variant": "official_cpu",
+      "cpu_procs": 1,
+      "batch": 1,
+      "img_per_s": 0.21036330621470112
+    },
+    {
+      "res": "4k_2160x3840",
+      "H": 2160,
+      "W": 3840,
+      "variant": "official_cpu",
+      "cpu_procs": 4,
+      "batch": 1,
+      "img_per_s": 0.8081419763492522
+    },
+    {
+      "res": "4k_2160x3840",
+      "H": 2160,
+      "W": 3840,
+      "variant": "official_cpu",
+      "cpu_procs": 8,
+      "batch": 1,
+      "img_per_s": 1.5289014159586471
+    },
+    {
+      "res": "4k_2160x3840",
+      "H": 2160,
+      "W": 3840,
+      "variant": "official_cpu",
+      "cpu_procs": 16,
+      "batch": 1,
+      "img_per_s": 2.7986600863507314
+    },
+    {
+      "res": "4k_2160x3840",
+      "H": 2160,
+      "W": 3840,
+      "variant": "official_cpu",
+      "cpu_procs": 32,
+      "batch": 1,
+      "img_per_s": 4.022471357175326
+    },
+    {
+      "res": "4k_2160x3840",
+      "H": 2160,
+      "W": 3840,
+      "variant": "ours_cpu",
+      "cpu_procs": 1,
+      "batch": 1,
+      "img_per_s": 1.611752795102466
+    },
+    {
+      "res": "4k_2160x3840",
+      "H": 2160,
+      "W": 3840,
+      "variant": "ours_cpu",
+      "cpu_procs": 4,
+      "batch": 1,
+      "img_per_s": 5.979637880901735
+    },
+    {
+      "res": "4k_2160x3840",
+      "H": 2160,
+      "W": 3840,
+      "variant": "ours_cpu",
+      "cpu_procs": 8,
+      "batch": 1,
+      "img_per_s": 11.483814791942079
+    },
+    {
+      "res": "4k_2160x3840",
+      "H": 2160,
+      "W": 3840,
+      "variant": "ours_cpu",
+      "cpu_procs": 16,
+      "batch": 1,
+      "img_per_s": 20.04612820812144
+    },
+    {
+      "res": "4k_2160x3840",
+      "H": 2160,
+      "W": 3840,
+      "variant": "ours_cpu",
+      "cpu_procs": 32,
+      "batch": 1,
+      "img_per_s": 24.335226382568116
+    },
+    {
+      "res": "4k_2160x3840",
+      "H": 2160,
+      "W": 3840,
+      "variant": "ours_gpu_fft2",
+      "batch": 1,
+      "img_per_s": 141.93075971375814,
+      "peak_mem_gib": 0.7313733100891113
+    },
+    {
+      "res": "4k_2160x3840",
+      "H": 2160,
+      "W": 3840,
+      "variant": "ours_gpu_fft2",
+      "batch": 8,
+      "img_per_s": 143.7363196518886,
+      "peak_mem_gib": 4.480406761169434
+    },
+    {
+      "res": "4k_2160x3840",
+      "H": 2160,
+      "W": 3840,
+      "variant": "ours_gpu_fft2",
+      "batch": 32,
+      "img_per_s": 143.7051168196121,
+      "peak_mem_gib": 17.831236839294434
+    },
+    {
+      "res": "4k_2160x3840",
+      "H": 2160,
+      "W": 3840,
+      "variant": "ours_gpu_rfft2",
+      "batch": 1,
+      "img_per_s": 239.09960649284275,
+      "peak_mem_gib": 2.9977407455444336
+    },
+    {
+      "res": "4k_2160x3840",
+      "H": 2160,
+      "W": 3840,
+      "variant": "ours_gpu_rfft2",
+      "batch": 8,
+      "img_per_s": 243.32396215290618,
+      "peak_mem_gib": 4.126043796539307
+    },
+    {
+      "res": "4k_2160x3840",
+      "H": 2160,
+      "W": 3840,
+      "variant": "ours_gpu_rfft2",
+      "batch": 32,
+      "img_per_s": 243.8651373992655,
+      "peak_mem_gib": 16.36642837524414
+    }
+  ]
+}
