@@ -188,6 +188,10 @@ def build():
     <div><img src="../figures/example_pasta.jpg"><div class="lbl">After PASTA (α=3, β=0.25, k=2)</div></div>
   </div>""" if has_example else ""
 
+    hi = n.get("hi", {})
+    hi_off, hi_gpu = hi.get(("cpu_official", HEADLINE_WORKERS)), hi.get(("gpu", HEADLINE_WORKERS))
+    hi_note = (f" At 1280 px the gap widens to <b>{fmt(hi_gpu['img_per_s_global'] / hi_off['img_per_s_global'], 1)}×</b>."
+               if hi_off and hi_gpu else "")
     if has_train:
         train_html = f"""
   <table class="res">
@@ -197,8 +201,8 @@ def build():
     <tr><td>One Sim10k epoch (10k images)</td><td>{fmt(n['t_epoch_off'], 1)} min</td><td><b>{fmt(n['t_epoch_gpu'], 1)} min</b></td></tr>
     <tr><td>100 epochs (projected)</td><td>{fmt(n['t_100ep_off'], 1)} h</td><td><b>{fmt(n['t_100ep_gpu'], 1)} h</b></td></tr>
   </table>
-  <p>GPU PASTA adds {fmt(n['t_gpu_pasta_ms'], 1)} ms per batch. The official version never feeds the GPU's
-  {fmt(n['t_demand'])} img/s, not even with {n['t_off_best_w']} workers ({fmt(n['t_off_best'])} img/s).</p>"""
+  <p>The official version never feeds the GPU's {fmt(n['t_demand'])} img/s, not even with
+  {n['t_off_best_w']} workers ({fmt(n['t_off_best'])} img/s).{hi_note}</p>"""
     else:
         train_html = "<p class='pending'>Training runs in progress.</p>"
 
