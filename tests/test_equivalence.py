@@ -6,7 +6,8 @@
 2. Distribution test (rfft path, noise sampled internally): the symmetrised
    half-spectrum noise we sample must have the same per-frequency mean/std as the
    noise implied by the reference, and the augmented images must have the same
-   per-pixel mean/std as the reference's over many draws.
+   per-pixel mean/std as the reference's over many draws (on a uniform-noise image,
+   whose pixels vary nearly independently, so |z| > 3 should occur at the chance rate).
 
 Usage: python tests/test_equivalence.py [--image path] [--device cuda:0] [--out results/equivalence.json]
 """
@@ -88,7 +89,12 @@ def noise_distribution_test(H, W, device, n=20000, seed=0):
 
 
 def output_distribution_test(img, device, n=2000, seed=0):
-    """Per-pixel mean/std of augmented images: official vs ours (rfft, fp32, internal noise)."""
+    """Per-pixel mean/std of augmented images: official vs ours (rfft, fp32, internal noise).
+
+    Use a uniform-noise image. On a natural image the low frequencies dominate the
+    perturbation, so all pixels of a channel move together and a count of |z| > 3
+    over pixels is not calibrated; a flat spectrum makes the pixels nearly independent.
+    """
     np.random.seed(seed)
     torch.manual_seed(seed)
     official = OfficialPASTA(ALPHA, BETA, K)
@@ -123,7 +129,8 @@ def main():
     report["exact"] = [exact_test(c.contiguous(), device, seed=i) for i, c in enumerate(crops)]
     report["noise_distribution"] = [noise_distribution_test(h, w, device)
                                     for h, w in [(16, 24), (15, 23), (16, 23), (15, 24)]]
-    report["output_distribution"] = output_distribution_test(full[:, :48, :64].contiguous(), device)
+    report["output_distribution"] = output_distribution_test(
+        torch.rand(3, 48, 64, generator=torch.Generator().manual_seed(0)), device)
 
     Path(args.out).parent.mkdir(parents=True, exist_ok=True)
     Path(args.out).write_text(json.dumps(report, indent=2))
