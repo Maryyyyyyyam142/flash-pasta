@@ -121,7 +121,7 @@ PIPELINE_SVG = """
   <text x="720" y="70" fill="#52514e" font-size="21">GPU</text>
   <rect x="720" y="82" width="262" height="44" rx="6" fill="#fff" stroke="#bdbcb6"/><text x="851" y="112" text-anchor="middle">train step</text>
 
-  <text x="0" y="186" font-weight="700" fill="#0b0b0b">Ours</text>
+  <text x="0" y="186" font-weight="700" fill="#0b0b0b">FlashPASTA</text>
   <rect x="0" y="200" width="470" height="96" rx="10" fill="#f4f3f0" stroke="#d6d5d0"/>
   <text x="14" y="228" fill="#52514e" font-size="21">each CPU worker</text>
   <rect x="14" y="240" width="150" height="44" rx="6" fill="#fff" stroke="#bdbcb6"/><text x="89" y="270" text-anchor="middle">decode</text>
@@ -151,7 +151,7 @@ def build():
     has_train = "t_speedup" in n
 
     tiles = [
-        (f"{fmt(n.get('k_speedup'))}×", f"faster PASTA on 1 GPU than the official code on {n.get('maxp', 32)} CPU cores"),
+        (f"{fmt(n.get('k_speedup'))}×", f"faster: FlashPASTA on 1 GPU vs the official code on {n.get('maxp', 32)} CPU cores"),
         (f"{fmt(n.get('t_off_stall'))}% → {fmt(n.get('t_gpu_stall'), 1)}%" if has_train else "pending",
          f"of training time the GPU sits waiting for data ({HEADLINE_WORKERS} CPU workers)"),
         (f"{fmt(n.get('t_speedup'), 1)}×" if has_train else "pending",
@@ -171,7 +171,7 @@ def build():
     if has_train:
         train_html = f"""
   <table class="res">
-    <tr><th>{HEADLINE_WORKERS} CPU workers, 640 px</th><th class="off">Official, CPU</th><th class="gpu">Ours, GPU</th></tr>
+    <tr><th>{HEADLINE_WORKERS} CPU workers, 640 px</th><th class="off">Official, CPU</th><th class="gpu">FlashPASTA, GPU</th></tr>
     <tr><td>Training throughput</td><td>{fmt(n['t_off'])} img/s</td><td><b>{fmt(n['t_gpu'])} img/s</b></td></tr>
     <tr><td>GPU waiting for data</td><td>{fmt(n['t_off_stall'])}%</td><td><b>{fmt(n['t_gpu_stall'], 1)}%</b></td></tr>
     <tr><td>One Sim10k epoch (10k images)</td><td>{fmt(n['t_epoch_off'], 1)} min</td><td><b>{fmt(n['t_epoch_gpu'], 1)} min</b></td></tr>
@@ -196,6 +196,7 @@ body {{ width: 1189mm; height: 841mm; position: relative; overflow: hidden; font
 header {{ background: #184f95; color: #fff; padding: 14mm 30mm 12mm; position: relative; }}
 header .titles {{ margin-right: 330mm; }}
 header .right {{ position: absolute; right: 30mm; top: 0; bottom: 0; display: flex; align-items: center; gap: 12mm; }}
+.brand {{ color: #9ec5f4; }}
 h1 {{ font-size: 80pt; line-height: 1.04; margin: 0 0 6mm; letter-spacing: -0.5pt; font-weight: 700; }}
 .authors {{ font-size: 36pt; font-weight: 600; }}
 .affil {{ font-size: 27pt; color: #cde2fb; }}
@@ -243,7 +244,7 @@ footer .link {{ text-align: right; white-space: nowrap; font-size: 22pt; color: 
 </style></head><body>
 <header>
   <div class="titles">
-    <h1>PASTA at GPU speed: taking Fourier augmentation<br>off the CPU critical path</h1>
+    <h1><span class="brand">FlashPASTA</span>: taking Fourier augmentation<br>off the CPU critical path</h1>
     <div class="authors">{names_html}</div>
     <div class="affil">{affil_html}</div>
     <div class="affil">{email_html}</div>
@@ -265,7 +266,7 @@ footer .link {{ text-align: right; white-space: nowrap; font-size: 22pt; color: 
   <p>The official code runs inside CPU data-loader workers, one image at a time, with float64 FFTs and the
   noise mask rebuilt on every call: <b>{fmt(n.get('k_off1'), 1)} images/s per core</b> at 1914×1052.
   At 640 px it cuts a worker from {fmt(n.get('ld_decode1'))} to {fmt(n.get('ld_off1'), 1)} images/s.</p></section>
-  <section><h2>Our approach</h2>
+  <section><h2>FlashPASTA</h2>
   {PIPELINE_SVG.replace("<svg ", '<svg class="pipe" ', 1)}
   <ul>
     <li><b>Batched cuFFT on the GPU</b>, once the batch has been transferred</li>
@@ -300,7 +301,7 @@ footer .link {{ text-align: right; white-space: nowrap; font-size: 22pt; color: 
   so all modes see identical inputs; steady-state epoch on 2,000 images.</p>
   {train_html}</section>
   <section class="box"><h2>Takeaways</h2><ul>
-    <li>On the GPU, PASTA is {fmt(n.get('k_speedup'))}× faster than the official code on {n.get('maxp', 32)} CPU cores,
+    <li>FlashPASTA on one GPU is {fmt(n.get('k_speedup'))}× faster than the official code on {n.get('maxp', 32)} CPU cores,
     with the same output up to floating-point rounding.</li>
     <li>It no longer eats the CPU-core budget, so a node feeds its GPU with a few workers.</li>
     <li>Restructuring ({fmt(n.get('k_alg'), 1)}× on one core) and the real-FFT identity ({fmt(n.get('k_rfft'), 1)}× on GPU)

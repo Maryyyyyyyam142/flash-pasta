@@ -22,8 +22,8 @@ RES, FIG = ROOT / "results", ROOT / "figures"
 
 C = {"gpu": "#2a78d6", "official": "#eb6834", "ours_cpu": "#1baf7a", "none": "#8a8984"}
 INK, INK2, GRID = "#0b0b0b", "#52514e", "#e4e3df"
-LABEL = {"gpu": "Ours, on GPU", "cpu_official": "Official, in CPU workers",
-         "cpu_ours": "Ours, in CPU workers", "none": "No PASTA"}
+LABEL = {"gpu": "FlashPASTA, on GPU", "cpu_official": "Official, in CPU workers",
+         "cpu_ours": "FlashPASTA, in CPU workers", "none": "No PASTA"}
 MODE_COLOR = {"gpu": C["gpu"], "cpu_official": C["official"], "cpu_ours": C["ours_cpu"], "none": C["none"]}
 MODES = ["none", "cpu_official", "cpu_ours", "gpu"]
 COL_W = 14.0  # inches, one poster column
@@ -81,8 +81,8 @@ def fig_kernel():
     bars = [
         ("Official, 1 core", kernel_best(rows, res, "official_cpu", 1), C["official"]),
         (f"Official, {maxp} cores", kernel_best(rows, res, "official_cpu", maxp), C["official"]),
-        (f"Ours, {maxp} cores", kernel_best(rows, res, "ours_cpu", maxp), C["ours_cpu"]),
-        ("Ours, 1 GPU", kernel_best(rows, res, "ours_gpu_rfft2"), C["gpu"]),
+        (f"FlashPASTA, {maxp} cores", kernel_best(rows, res, "ours_cpu", maxp), C["ours_cpu"]),
+        ("FlashPASTA, 1 GPU", kernel_best(rows, res, "ours_gpu_rfft2"), C["gpu"]),
     ]
     base = bars[1][1]
     fig, (a, b) = plt.subplots(1, 2, figsize=(COL_W, 5.6), gridspec_kw={"width_ratios": [1.2, 1], "wspace": 0.55})
@@ -104,8 +104,8 @@ def fig_kernel():
 
     xs = list(range(len(RES_ORDER)))
     for variant, procs, col, lab in [("official_cpu", maxp, C["official"], f"Official, {maxp} cores"),
-                                     ("ours_cpu", maxp, C["ours_cpu"], f"Ours, {maxp} cores"),
-                                     ("ours_gpu_rfft2", None, C["gpu"], "Ours, 1 GPU")]:
+                                     ("ours_cpu", maxp, C["ours_cpu"], f"FlashPASTA, {maxp} cores"),
+                                     ("ours_gpu_rfft2", None, C["gpu"], "FlashPASTA, 1 GPU")]:
         line(b, xs, [kernel_best(rows, r, variant, procs) for r in RES_ORDER], col, lab)
     b.set_yscale("log")
     b.set_xticks(xs, [RES_NAME[r] for r in RES_ORDER])
@@ -161,7 +161,7 @@ def fig_loader():
         ax.set_title("Resized to 640" if sz == "640" else "Native 1914×1052")
     axes[0][0].set_ylabel("Images / s delivered (log)")
     handles, labels = axes[0][0].get_legend_handles_labels()
-    fig.legend(handles, labels, loc="upper center", ncol=4, bbox_to_anchor=(0.5, 1.1), fontsize=18,
+    fig.legend(handles, labels, loc="upper center", ncol=2, bbox_to_anchor=(0.5, 1.16), fontsize=18,
                handlelength=1.6, columnspacing=1.2)
     save(fig, "fig2_loader")
 
@@ -189,7 +189,7 @@ def fig_train():
     b.set_ylim(0, 100)
     b.set_title("Data-loader stall")
     handles, labels = a.get_legend_handles_labels()
-    fig.legend(handles, labels, loc="upper center", ncol=4, bbox_to_anchor=(0.5, 1.1), fontsize=18,
+    fig.legend(handles, labels, loc="upper center", ncol=2, bbox_to_anchor=(0.5, 1.16), fontsize=18,
                handlelength=1.6, columnspacing=1.2)
     save(fig, "fig3_train")
 
