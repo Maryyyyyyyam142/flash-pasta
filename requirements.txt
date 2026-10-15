@@ -7,3 +7,4 @@ ultralytics>=8.4
 nvidia-ml-py
 matplotlib
 weasyprint
+segno

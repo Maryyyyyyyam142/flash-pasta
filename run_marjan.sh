@@ -2,7 +2,7 @@
 # Training-throughput sweep on the Marjan Red Sea coral dataset (640x640 images), single GPU.
 set -u
 cd "$(dirname "$0")"
-PY=.venv/bin/python
+PY=${PY:-.venv/bin/python}
 GPU=${GPU:-2}
 mkdir -p results/train_marjan logs
 

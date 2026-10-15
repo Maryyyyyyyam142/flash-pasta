@@ -121,7 +121,8 @@ python bench/plot.py && python poster/make_assets.py && python poster/build_post
 ```
 
 Run the benchmarks on an otherwise idle GPU and CPU; other jobs on the same machine skew
-the CPU-worker numbers.
+the CPU-worker numbers. The run scripts use `.venv/bin/python`; set `PY=python` to use
+another interpreter.
 
 ## References
 
