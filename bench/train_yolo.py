@@ -8,8 +8,9 @@ Example (one GPU, physical id 2):
 Two GPUs (DDP):
   python bench/train_yolo.py --mode gpu --workers 4 --device 1,2 --batch 32 ...
 
-Pass physical GPU ids via --device; do not set CUDA_VISIBLE_DEVICES yourself
-(Ultralytics overwrites it from --device).
+Pass physical GPU ids via --device. Ultralytics >= 8.4 no longer overwrites
+CUDA_VISIBLE_DEVICES; if you set it yourself, --device may be either the physical
+ids it lists or the torch indices under it.
 """
 import argparse
 import os

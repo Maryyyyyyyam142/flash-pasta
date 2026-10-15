@@ -109,6 +109,10 @@ class PastaDetectionTrainer(DetectionTrainer):
 
     def preprocess_batch(self, batch):
         batch = super().preprocess_batch(batch)
+        if "images" in self._t:
+            # Count the images this rank actually got: self.batch_size is the global batch under DDP,
+            # and the last batch of an epoch can be smaller.
+            self._t["images"] += batch["img"].shape[0]
         if self.gpu_pasta is not None:
             start, end = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
             start.record()
@@ -140,7 +144,6 @@ class PastaDetectionTrainer(DetectionTrainer):
         self._t["step"] += now - self._t["batch_start"]
         self._t["last_end"] = now
         self._t["batches"] += 1
-        self._t["images"] += self.batch_size
 
     def _on_train_epoch_end(self, _):
         if RANK not in {-1, 0}:
