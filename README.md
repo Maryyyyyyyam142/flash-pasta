@@ -49,12 +49,15 @@ spent waiting for the next batch.
 | 640 px, 2 workers | 11.7 img/s, 94% waiting | 75.7 img/s, 59% waiting | 156.9 img/s, 12% waiting | 13.5× |
 | 640 px, 8 workers | 41.6 img/s, 77% waiting | 176.1 img/s, 0.4% waiting | 173.8 img/s, 0.2% waiting | 4.2× |
 | 640 px, 16 workers | 78.5 img/s, 55% waiting | 175.5 img/s, 0.3% waiting | 173.8 img/s, 0.3% waiting | 2.2× |
+| 640 px, 32 workers | 126.4 img/s, 0.4% waiting | 177.4 img/s, 0.3% waiting | 175.1 img/s, 0.3% waiting | 1.4× |
 | 1280 px, 8 workers | 7.1 img/s, 85% waiting | 46.8 img/s, 0.2% waiting | 46.0 img/s, 0.1% waiting | 6.4× |
 
-Without PASTA the same model trains at up to 177 img/s (640 px) and 48 img/s (1280 px). On the
-GPU, FlashPASTA costs at most 3% of that with any number of workers (with 2 workers, JPEG
-decoding is the limit with or without PASTA). In CPU workers it keeps up from 8 workers per
-GPU, and the official implementation never keeps up, even with all 32 cores.
+Without PASTA the same model trains at up to 178 img/s (640 px) and 48 img/s (1280 px). On the
+GPU, FlashPASTA costs at most 1.7% of that at 640 px with any number of workers (with 2 workers,
+JPEG decoding is the limit with or without PASTA) and 4–5% at 1280 px. In CPU workers it keeps
+up from 8 workers per GPU. The official implementation never keeps up: with 32 workers the GPU
+no longer waits for data, but the busy workers compete with the training process for the CPU
+and slow each step by 41%.
 
 ### Case study: Red Sea coral reefs (Marjan dataset)
 
@@ -124,8 +127,10 @@ python bench/plot.py && python poster/make_assets.py && python poster/build_post
 ```
 
 Run the benchmarks on an otherwise idle GPU and CPU; other jobs on the same machine skew
-the CPU-worker numbers. The run scripts use `.venv/bin/python`; set `PY=python` to use
-another interpreter.
+the CPU-worker numbers. `bench/train_yolo.py` makes only the training GPUs visible, because
+Ultralytics otherwise caps data-loader workers at CPU threads ÷ visible GPUs, and it stops if
+the loader gets fewer workers than requested. The run scripts use `.venv/bin/python`; set
+`PY=python` to use another interpreter.
 
 ## References
 

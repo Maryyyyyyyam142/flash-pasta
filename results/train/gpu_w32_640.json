@@ -4,8 +4,8 @@
     "workers": 32,
     "batch": 16,
     "imgsz": 640,
-    "model": "weights/yolo26s.pt",
-    "device": "2",
+    "model": "yolo26s.pt",
+    "device": "0",
     "world_size": 1,
     "fraction": 0.2,
     "gpu": "NVIDIA RTX A5000",
@@ -19,28 +19,28 @@
   "epochs": [
     {
       "epoch": 1,
-      "train_loop_s": 17.291499704122543,
-      "data_wait_s": 1.2480511986650527,
-      "step_s": 16.04344850545749,
-      "data_wait_frac": 0.07217715178097012,
+      "train_loop_s": 19.1971872090362,
+      "data_wait_s": 2.163063227199018,
+      "step_s": 17.034123981837183,
+      "data_wait_frac": 0.11267605007158833,
       "batches": 125,
-      "img_per_s_global": 115.66376741302382,
-      "gpu_pasta_s_rank0": 0.3823684804439545,
+      "img_per_s_global": 104.18192927027305,
+      "gpu_pasta_s_rank0": 0.45368214082717895,
       "gpu_util_mean": [
-        53.85964912280702
+        47.544973544973544
       ]
     },
     {
       "epoch": 2,
-      "train_loop_s": 11.883215040434152,
-      "data_wait_s": 0.03272499702870846,
-      "step_s": 11.850490043405443,
-      "data_wait_frac": 0.002753884106056946,
+      "train_loop_s": 11.422350032720715,
+      "data_wait_s": 0.029393435921519995,
+      "step_s": 11.392956596799195,
+      "data_wait_frac": 0.002573326490373602,
       "batches": 125,
-      "img_per_s_global": 168.30462069353666,
-      "gpu_pasta_s_rank0": 0.289996098279953,
+      "img_per_s_global": 175.0953170118895,
+      "gpu_pasta_s_rank0": 0.2899336974620819,
       "gpu_util_mean": [
-        79.77118644067797
+        82.99122807017544
       ]
     }
   ]
