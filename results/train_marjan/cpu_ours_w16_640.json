@@ -4,7 +4,7 @@
     "workers": 16,
     "batch": 16,
     "imgsz": 640,
-    "model": "weights/yolo26s.pt",
+    "model": "yolo26s.pt",
     "device": "2",
     "world_size": 1,
     "fraction": 0.25,
@@ -19,28 +19,28 @@
   "epochs": [
     {
       "epoch": 1,
-      "train_loop_s": 22.61238083615899,
-      "data_wait_s": 1.618426133878529,
-      "step_s": 20.993954702280462,
-      "data_wait_frac": 0.07157256662202227,
+      "train_loop_s": 22.836722269188613,
+      "data_wait_s": 2.149220287799835,
+      "step_s": 20.687501981388777,
+      "data_wait_frac": 0.09411246773796303,
       "batches": 149,
-      "img_per_s_global": 105.42896907997387,
+      "img_per_s_global": 103.95537380611793,
       "gpu_pasta_s_rank0": 0.0,
       "gpu_util_mean": [
-        47.02232142857143
+        46.85398230088496
       ]
     },
     {
       "epoch": 2,
-      "train_loop_s": 13.534477787092328,
-      "data_wait_s": 0.03571812575682998,
-      "step_s": 13.498759661335498,
-      "data_wait_frac": 0.0026390472036456353,
+      "train_loop_s": 13.561890963930637,
+      "data_wait_s": 0.03705721069127321,
+      "step_s": 13.524833753239363,
+      "data_wait_frac": 0.002732451602053947,
       "batches": 149,
-      "img_per_s_global": 176.1427398605355,
+      "img_per_s_global": 175.04933539975494,
       "gpu_pasta_s_rank0": 0.0,
       "gpu_util_mean": [
-        77.33333333333333
+        78.78676470588235
       ]
     }
   ]
