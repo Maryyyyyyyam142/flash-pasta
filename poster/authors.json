@@ -1,7 +1,7 @@
 {
   "authors": [
-    {"name": "Maryam Saif", "affiliation": "SDAIA", "email": "maryam.h.saif@gmail.com"},
-    {"name": "Esraa Saif", "affiliation": "IBM", "email": "es.saif2002@gmail.com"}
+    {"name": "Maryam Saif", "email": "maryam.h.saif@gmail.com"},
+    {"name": "Esraa Saif", "email": "es.saif2002@gmail.com"}
   ],
   "code_url": "https://github.com/Maryyyyyyyam142/flash-pasta"
 }
