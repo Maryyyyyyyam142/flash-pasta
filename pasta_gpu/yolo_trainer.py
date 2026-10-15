@@ -174,7 +174,7 @@ class PastaDetectionTrainer(DetectionTrainer):
             meta = {
                 "pasta_mode": self.pasta_mode,
                 "workers": self.args.workers, "batch": self.batch_size, "imgsz": self.args.imgsz,
-                "model": str(self.args.model), "device": str(self.args.device),
+                "model": Path(str(self.args.model)).name, "device": str(self.args.device),
                 "world_size": max(1, int(os.getenv("WORLD_SIZE", 1))), "fraction": self.args.fraction,
                 "gpu": torch.cuda.get_device_name(self.device),
                 "gpu_physical_ids": getattr(getattr(self, "_sampler", None), "physical_ids", None), "alpha": os.getenv("PASTA_ALPHA", "3.0"),
