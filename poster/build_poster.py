@@ -13,6 +13,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 RES, POSTER = ROOT / "results", ROOT / "poster"
 HEADLINE_WORKERS = 8  # CPU cores per GPU on a typical shared HPC GPU node
+RES_METHODS = [("off", "off", "Official, CPU"), ("ours", "cpu", "FlashPASTA, CPU"), ("gpu", "gpu", "FlashPASTA, GPU")]
 
 
 def load(name):
@@ -44,9 +45,8 @@ def numbers():
         maxp = max(r.get("cpu_procs", 0) for r in rows)
         s = "sim10k_1052x1914"
         n.update(maxp=maxp, k_off1=best(s, "official_cpu", 1), k_offN=best(s, "official_cpu", maxp),
-                 k_oursN=best(s, "ours_cpu", maxp), k_ours1=best(s, "ours_cpu", 1), k_gpu=best(s, "ours_gpu_rfft2"),
-                 k_gpu_fft2=best(s, "ours_gpu_fft2"), k640_off1=best("640x640", "official_cpu", 1),
-                 k640_gpu=best("640x640", "ours_gpu_rfft2"), gpu_name=k["meta"]["gpu"], cpu_name=k["meta"]["cpu"])
+                 k_ours1=best(s, "ours_cpu", 1), k_gpu=best(s, "ours_gpu_rfft2"), k_gpu_fft2=best(s, "ours_gpu_fft2"),
+                 gpu_name=k["meta"]["gpu"], cpu_name=k["meta"]["cpu"])
         n["k_speedup"] = n["k_gpu"] / n["k_offN"]
         n["k_alg"] = n["k_ours1"] / n["k_off1"]
         n["k_rfft"] = n["k_gpu"] / n["k_gpu_fft2"]
@@ -63,6 +63,7 @@ def numbers():
         od = e["output_distribution"]
         n["eq_px_total"] = 3 * od["H"] * od["W"]
         n["eq_px_off"] = round(od["pixel_mean_abs_z_gt3_frac"] * n["eq_px_total"])
+        n["eq_px_chance"] = round(od["expected_gt3_frac_if_identical"] * n["eq_px_total"])
 
     ld = load("loader.json")
     if ld:
@@ -70,10 +71,9 @@ def numbers():
                                         if str(r["imgsz"]) == sz and r["mode"] == mode and r["workers"] == w), None)
         n["ld_decode1"] = get("640", "none", 1)
         n["ld_off1"] = get("640", "cpu_official", 1)
-        none_w, gpu_w, off_w = (get("640", m, HEADLINE_WORKERS) for m in ("none", "gpu", "cpu_official"))
-        if none_w and gpu_w and off_w:
+        none_w, gpu_w = get("640", "none", HEADLINE_WORKERS), get("640", "gpu", HEADLINE_WORKERS)
+        if none_w and gpu_w:
             n["ld_gpu_frac"] = gpu_w / none_w
-            n["ld_off_slow"] = none_w / off_w
 
     runs = []
     tdir = RES / "train"
@@ -83,45 +83,42 @@ def numbers():
             runs.append({**d["meta"], **d["epochs"][-1]})
     single = [r for r in runs if r["world_size"] == 1 and r["imgsz"] == 640]
     pick = lambda mode, w: next((r for r in single if r["pasta_mode"] == mode and r["workers"] == w), None)  # noqa: E731
-    off, gpu, none = pick("cpu_official", HEADLINE_WORKERS), pick("gpu", HEADLINE_WORKERS), pick("none", HEADLINE_WORKERS)
-    if off and gpu:
-        n.update(t_off=off["img_per_s_global"], t_gpu=gpu["img_per_s_global"],
-                 t_none=none["img_per_s_global"] if none else None,
+    off, gpu, ours = (pick(m, HEADLINE_WORKERS) for m in ("cpu_official", "gpu", "cpu_ours"))
+    if off and gpu and ours:
+        n.update(t_off=off["img_per_s_global"], t_gpu=gpu["img_per_s_global"], t_ours=ours["img_per_s_global"],
                  t_off_stall=100 * off["data_wait_frac"], t_gpu_stall=100 * gpu["data_wait_frac"],
-                 t_off_util=(off["gpu_util_mean"] or [None])[0], t_gpu_util=(gpu["gpu_util_mean"] or [None])[0])
+                 t_ours_stall=100 * ours["data_wait_frac"])
         n["t_speedup"] = n["t_gpu"] / n["t_off"]
-        n["t_epoch_off"] = 10000 / n["t_off"] / 60
-        n["t_epoch_gpu"] = 10000 / n["t_gpu"] / 60
-        n["t_100ep_off"] = 100 * 10000 / n["t_off"] / 3600
-        n["t_100ep_gpu"] = 100 * 10000 / n["t_gpu"] / 3600
-        n["t_gpu_pasta_ms"] = 1000 * gpu["gpu_pasta_s_rank0"] / gpu["batches"]
-        offs = [r for r in single if r["pasta_mode"] == "cpu_official"]
-        n["t_off_best"] = max(r["img_per_s_global"] for r in offs)
-        n["t_off_best_w"] = max(offs, key=lambda r: r["img_per_s_global"])["workers"]
-        demand = max(r["img_per_s_global"] for r in single if r["pasta_mode"] == "none")
-        n["t_demand"] = demand
-        ok = sorted(r["workers"] for r in single if r["pasta_mode"] == "gpu" and r["img_per_s_global"] >= 0.9 * demand)
-        n["t_gpu_min_w"] = ok[0] if ok else None
+        for m in ("off", "ours", "gpu"):
+            n[f"t_epoch_{m}"] = 10000 / n[f"t_{m}"] / 60
+        n["t_off_max_w"] = max(r["workers"] for r in single if r["pasta_mode"] == "cpu_official")
+        n["t_demand"] = max(r["img_per_s_global"] for r in single if r["pasta_mode"] == "none")
+        # Compare each PASTA mode with no PASTA at the same worker count: GPU PASTA's worst-case cost,
+        # and the fewest workers with which FlashPASTA in CPU workers keeps up (within 5%)
+        base = {r["workers"]: r["img_per_s_global"] for r in single if r["pasta_mode"] == "none"}
+        rel = lambda mode: {r["workers"]: r["img_per_s_global"] / base[r["workers"]]  # noqa: E731
+                            for r in single if r["pasta_mode"] == mode and r["workers"] in base}
+        n["t_gpu_cost"] = 100 * (1 - min(rel("gpu").values()))
+        n["t_ours_min_w"] = min((w for w, v in rel("cpu_ours").items() if v >= 0.95), default=None)
     mj = []
     if (RES / "train_marjan").exists():
         for p in sorted((RES / "train_marjan").glob("*.json")):
             d = json.loads(p.read_text())
             mj.append({**d["meta"], **d["epochs"][-1]})
     mpick = lambda mode: next((r for r in mj if r["pasta_mode"] == mode and r["workers"] == HEADLINE_WORKERS), None)  # noqa: E731
-    m_off, m_gpu = mpick("cpu_official"), mpick("gpu")
+    m_off, m_gpu, m_ours = mpick("cpu_official"), mpick("gpu"), mpick("cpu_ours")
     m_train = ROOT / "data/marjan/train/images"
     n["m_images"] = len(list(m_train.iterdir())) if m_train.exists() else 9498
-    if m_off and m_gpu:
-        n.update(m_off=m_off["img_per_s_global"], m_gpu=m_gpu["img_per_s_global"],
-                 m_off_stall=100 * m_off["data_wait_frac"], m_gpu_stall=100 * m_gpu["data_wait_frac"])
+    if m_off and m_gpu and m_ours:
+        n.update(m_off=m_off["img_per_s_global"], m_gpu=m_gpu["img_per_s_global"], m_ours=m_ours["img_per_s_global"],
+                 m_off_stall=100 * m_off["data_wait_frac"], m_gpu_stall=100 * m_gpu["data_wait_frac"],
+                 m_ours_stall=100 * m_ours["data_wait_frac"])
         n["m_speedup"] = n["m_gpu"] / n["m_off"]
-        n["m_epoch_off"] = n["m_images"] / n["m_off"] / 60
-        n["m_epoch_gpu"] = n["m_images"] / n["m_gpu"] / 60
+        for m in ("off", "ours", "gpu"):
+            n[f"m_epoch_{m}"] = n["m_images"] / n[f"m_{m}"] / 60
     hi = [r for r in runs if r["world_size"] == 1 and r["imgsz"] == 1280]
     if hi:
         n["hi"] = {(r["pasta_mode"], r["workers"]): r for r in hi}
-    multi = [r for r in runs if r["world_size"] > 1]
-    n["has_scaling"] = bool(multi)
     return n
 
 
@@ -142,16 +139,16 @@ PIPELINE_SVG = """
   <rect x="720" y="82" width="262" height="44" rx="6" fill="#fff" stroke="#bdbcb6"/><text x="851" y="112" text-anchor="middle">train step</text>
 
   <text x="0" y="186" font-weight="700" fill="#0b0b0b">FlashPASTA</text>
-  <rect x="0" y="200" width="470" height="96" rx="10" fill="#f4f3f0" stroke="#d6d5d0"/>
+  <rect x="0" y="200" width="346" height="96" rx="10" fill="#f4f3f0" stroke="#d6d5d0"/>
   <text x="14" y="228" fill="#52514e" font-size="21">each CPU worker</text>
   <rect x="14" y="240" width="150" height="44" rx="6" fill="#fff" stroke="#bdbcb6"/><text x="89" y="270" text-anchor="middle">decode</text>
   <rect x="182" y="240" width="150" height="44" rx="6" fill="#fff" stroke="#bdbcb6"/><text x="257" y="270" text-anchor="middle">resize</text>
-  <line x1="474" y1="262" x2="530" y2="262" stroke="#52514e" stroke-width="3" marker-end="url(#ar)"/>
-  <rect x="536" y="200" width="460" height="96" rx="10" fill="#f4f3f0" stroke="#d6d5d0"/>
-  <text x="550" y="228" fill="#52514e" font-size="21">GPU, whole batch at once</text>
-  <rect x="550" y="240" width="250" height="44" rx="6" fill="#d5e5f9" stroke="#2a78d6" stroke-width="2.5"/>
-  <text x="675" y="270" text-anchor="middle">PASTA: batched rFFT</text>
-  <rect x="814" y="240" width="168" height="44" rx="6" fill="#fff" stroke="#bdbcb6"/><text x="898" y="270" text-anchor="middle">train step</text>
+  <line x1="350" y1="262" x2="406" y2="262" stroke="#52514e" stroke-width="3" marker-end="url(#ar)"/>
+  <rect x="412" y="200" width="584" height="96" rx="10" fill="#f4f3f0" stroke="#d6d5d0"/>
+  <text x="426" y="228" fill="#52514e" font-size="21">GPU, whole batch at once</text>
+  <rect x="426" y="240" width="280" height="44" rx="6" fill="#d5e5f9" stroke="#2a78d6" stroke-width="2.5"/>
+  <text x="566" y="270" text-anchor="middle">PASTA: rFFT, float32</text>
+  <rect x="720" y="240" width="262" height="44" rx="6" fill="#fff" stroke="#bdbcb6"/><text x="851" y="270" text-anchor="middle">train step</text>
 </svg>
 """
 
@@ -176,7 +173,7 @@ def build():
          f"of training time the GPU sits waiting for data ({HEADLINE_WORKERS} CPU workers)"),
         (f"{fmt(n.get('t_speedup'), 1)}×" if has_train else "pending",
          f"faster YOLO training on Sim10k with the same {HEADLINE_WORKERS} workers"),
-        (sci(n["eq_max_err"]) if "eq_max_err" in n else "—",
+        (sci(n["eq_max_err"], 1) if "eq_max_err" in n else "—",
          "largest pixel difference from the official output, same noise"),
     ]
     tiles_html = "".join(f'<div class="tile"><div class="big">{escape(b)}</div><div class="cap">{escape(c)}</div></div>'
@@ -190,19 +187,27 @@ def build():
 
     hi = n.get("hi", {})
     hi_off, hi_gpu = hi.get(("cpu_official", HEADLINE_WORKERS)), hi.get(("gpu", HEADLINE_WORKERS))
-    hi_note = (f" At 1280 px the gap widens to <b>{fmt(hi_gpu['img_per_s_global'] / hi_off['img_per_s_global'], 1)}×</b>."
+    hi_note = (f" At 1280 px: <b>{fmt(hi_gpu['img_per_s_global'] / hi_off['img_per_s_global'], 1)}×</b> (GPU vs official)."
                if hi_off and hi_gpu else "")
+
+    def res_table(p, epoch_head):
+        """One row per method, coloured like the figures; p is the key prefix ('t' Sim10k, 'm' Marjan)."""
+        rows = "".join(
+            f'<tr><th class="{cls}">{label}</th>'
+            + "".join(f"<td>{v}</td>" if m == "off" else f"<td><b>{v}</b></td>" for v in (
+                fmt(n[f"{p}_{m}"]), f"{fmt(n[f'{p}_{m}_stall'], 0 if m == 'off' else 1)}%",
+                f"{fmt(n[f'{p}_epoch_{m}'], 1)} min"))
+            + "</tr>"
+            for m, cls, label in RES_METHODS)
+        return (f'<table class="res"><tr><th>{HEADLINE_WORKERS} CPU workers, 640 px</th><th>Images/s</th>'
+                f"<th>GPU waiting</th><th>{epoch_head}</th></tr>{rows}</table>")
+
     if has_train:
         train_html = f"""
-  <table class="res">
-    <tr><th>{HEADLINE_WORKERS} CPU workers, 640 px</th><th class="off">Official, CPU</th><th class="gpu">FlashPASTA, GPU</th></tr>
-    <tr><td>Training throughput</td><td>{fmt(n['t_off'])} img/s</td><td><b>{fmt(n['t_gpu'])} img/s</b></td></tr>
-    <tr><td>GPU waiting for data</td><td>{fmt(n['t_off_stall'])}%</td><td><b>{fmt(n['t_gpu_stall'], 1)}%</b></td></tr>
-    <tr><td>One Sim10k epoch (10k images)</td><td>{fmt(n['t_epoch_off'], 1)} min</td><td><b>{fmt(n['t_epoch_gpu'], 1)} min</b></td></tr>
-    <tr><td>100 epochs (projected)</td><td>{fmt(n['t_100ep_off'], 1)} h</td><td><b>{fmt(n['t_100ep_gpu'], 1)} h</b></td></tr>
-  </table>
-  <p>The official version never feeds the GPU's {fmt(n['t_demand'])} img/s, not even with
-  {n['t_off_best_w']} workers ({fmt(n['t_off_best'])} img/s).{hi_note}</p>"""
+  {res_table("t", "Sim10k epoch")}
+  <p>The official code never keeps up with the GPU's {fmt(n['t_demand'])} img/s, even with {n['t_off_max_w']} workers.
+  FlashPASTA keeps up from {n['t_ours_min_w']} CPU workers; on the GPU, with any number
+  (≤{fmt(n['t_gpu_cost'])}% cost).{hi_note}</p>"""
     else:
         train_html = "<p class='pending'>Training runs in progress.</p>"
 
@@ -212,12 +217,7 @@ def build():
     short_cpu = re.sub(r"^AMD Ryzen |^Intel\(R\) ", "", n.get("cpu_name", ""))
     short_cpu = re.sub(r" (\d+)-Cores?$", r" (\1 cores)", short_cpu)
     if "m_speedup" in n:
-        coral_rows = f"""
-  <table class="res">
-    <tr><th>{HEADLINE_WORKERS} CPU workers, 640 px</th><th class="off">Official, CPU</th><th class="gpu">FlashPASTA, GPU</th></tr>
-    <tr><td>GPU waiting for data</td><td>{fmt(n['m_off_stall'])}%</td><td><b>{fmt(n['m_gpu_stall'], 1)}%</b></td></tr>
-    <tr><td>One epoch ({fmt(n['m_images'])} images)</td><td>{fmt(n['m_epoch_off'], 1)} min</td><td><b>{fmt(n['m_epoch_gpu'], 1)} min</b></td></tr>
-  </table>"""
+        coral_rows = res_table("m", "Epoch")
         coral_head = f"4 · Red Sea corals: {fmt(n['m_speedup'], 1)}× faster training"
     else:
         coral_rows = "<p class='pending'>Coral runs in progress.</p>"
@@ -229,8 +229,7 @@ def build():
   <div class="corals">{thumbs}</div>
   {coral_rows}</section>"""
 
-    loader_claim = (f"GPU PASTA is nearly free" if n.get("ld_gpu_frac", 0) >= 0.9 else "PASTA on CPU vs GPU")
-    dotted_note = ""
+    loader_claim = "GPU PASTA is nearly free" if n.get("ld_gpu_frac", 0) >= 0.9 else "PASTA on CPU vs GPU"
     train_claim = (f"YOLO training: {fmt(n['t_speedup'], 1)}× faster epochs" if has_train
                    else "YOLO training on Sim10k")
 
@@ -288,13 +287,14 @@ table {{ border-collapse: collapse; width: 100%; font-size: 27pt; margin: 2mm 0 
 th, td {{ text-align: left; padding: 2mm 3mm; border-bottom: 0.5mm solid #d6d5d0; vertical-align: top; }}
 th {{ color: #52514e; font-weight: 600; }}
 td.num {{ text-align: right; font-weight: 700; color: #184f95; white-space: nowrap; }}
-table.res th.off {{ color: #c4501f; }} table.res th.gpu {{ color: #1c5cab; }}
+table.res th.off {{ color: #c4501f; }} table.res th.cpu {{ color: #12805a; }} table.res th.gpu {{ color: #1c5cab; }}
 .box {{ background: #eaf2fc; border-radius: 3mm; padding: 6mm 7mm 3mm; }}
 .box h2 {{ border-left: none; padding-left: 0; }}
 footer {{ position: absolute; left: 30mm; right: 30mm; bottom: 10mm; padding-top: 5mm;
           border-top: 0.6mm solid #d6d5d0; display: flex; gap: 20mm;
           font-size: 20pt; color: #52514e; line-height: 1.3; }}
 footer .refs {{ flex: 1; }}
+.nw {{ white-space: nowrap; }}
 footer .link {{ text-align: right; white-space: nowrap; font-size: 22pt; color: #184f95; font-weight: 600; }}
 .pending {{ color: #b45309; }}
 </style></head><body>
@@ -319,14 +319,15 @@ footer .link {{ text-align: right; white-space: nowrap; font-size: 22pt; color: 
   <b>PASTA</b> [1] closes part of the gap by randomly perturbing each image's Fourier amplitude spectrum,
   more strongly at high frequencies.</p>
   {example_html}
-  <p>The official code runs per image inside CPU data-loader workers, with float64 FFTs and the noise mask
-  rebuilt on every call: <b>{fmt(n.get('k_off1'), 1)} images/s per core</b> at 1914×1052. At 640 px it slows a
+  <p>The official code runs per image inside CPU data-loader workers, with float64 noise and inverse FFT and
+  the noise mask rebuilt on every call: <b>{fmt(n.get('k_off1'), 1)} images/s per core</b> at 1914×1052. At 640 px it slows a
   worker from <b>{fmt(n.get('ld_decode1'))} to {fmt(n.get('ld_off1'), 1)} images/s</b>.</p></section>
   <section><h2>FlashPASTA</h2>
   {PIPELINE_SVG.replace("<svg ", '<svg class="pipe" ', 1)}
   <ul>
     <li><b>Batched cuFFT on the GPU</b> after the batch is transferred</li>
     <li><b>Noise mask cached</b> per image size</li>
+    <li><b>float32 throughout</b>{f", within {sci(n['eq_max_err'], 1)} of the official output" if 'eq_max_err' in n else ""}</li>
     <li><b>F·ε replaces |F|·ε·e<sup>iφ</sup></b>: no abs, angle or exp</li>
     <li><b>Half-size real FFT</b>, exact because only the real part is kept:</li>
   </ul>
@@ -336,7 +337,7 @@ footer .link {{ text-align: right; white-space: nowrap; font-size: 22pt; color: 
     <tr><td>Same noise: largest pixel difference (float32)</td><td class="num">{sci(n['eq_max_err'], 1) if 'eq_max_err' in n else '—'}</td></tr>
     <tr><td>8-bit pixels that change (by {fmt(n.get('eq_uint8_max'))} level)</td><td class="num">{100 * n.get('eq_uint8', 0):.3f}%</td></tr>
     <tr><td>Sampled noise spread vs official</td><td class="num">{fmt(n.get('eq_std_lo'), 2)}–{fmt(n.get('eq_std_hi'), 2)}×</td></tr>
-    <tr><td>Pixel means that differ (|z| &gt; 3)</td><td class="num">{fmt(n.get('eq_px_off'))} / {fmt(n.get('eq_px_total'))}</td></tr>
+    <tr><td>Pixel means with |z| &gt; 3 (≈{fmt(n.get('eq_px_chance'))} expected by chance)</td><td class="num">{fmt(n.get('eq_px_off'))} / {fmt(n.get('eq_px_total'))}</td></tr>
   </table></section>
 </div>
 <div class="col wide">
@@ -347,11 +348,12 @@ footer .link {{ text-align: right; white-space: nowrap; font-size: 22pt; color: 
   <section><h2>2 · Data loading: {loader_claim}</h2>
   <img class="fig" src="../figures/fig2_loader.svg">
   <p class="caption"><b>Figure 2.</b> Images/s a PyTorch DataLoader delivers on Sim10k (JPEG decode →
-  letterbox → PASTA) vs CPU workers.{dotted_note}</p></section>
+  letterbox → PASTA) vs CPU workers.</p></section>
   <section class="box"><h2>Takeaways</h2><ul>
     <li>FlashPASTA on one GPU is {fmt(n.get('k_speedup'))}× faster than the official code on {n.get('maxp', 32)} CPU cores,
     with the same output up to floating-point rounding.</li>
-    <li>It no longer eats the CPU-core budget, so a node feeds its GPU with a few workers.</li>
+    <li>On the GPU it costs ≤{fmt(n.get('t_gpu_cost'))}% of training speed with any number of workers;
+    in CPU workers FlashPASTA needs {n.get('t_ours_min_w', '—')} to keep up.</li>
     <li>Restructuring ({fmt(n.get('k_alg'), 1)}× on one core) and the real-FFT identity ({fmt(n.get('k_rfft'), 1)}× on GPU)
     apply to any Fourier-domain augmentation.</li></ul></section>
 </div>
@@ -369,10 +371,12 @@ footer .link {{ text-align: right; white-space: nowrap; font-size: 22pt; color: 
   <div class="refs">
   [1] P. Chattopadhyay, K. Sarangmath, V. Vijaykumar, J. Hoffman. PASTA: Proportional Amplitude Spectrum Training
   Augmentation for Syn-to-Real Domain Generalization. ICCV 2023.
-  [2] M. Johnson-Roberson et al. Driving in the Matrix. ICRA 2017. Sim10k, doi:10.7302/e1f1-3d97, CC BY-NC 4.0.
+  [2] M. Johnson-Roberson et al. Driving in the Matrix. ICRA 2017. Sim10k, doi:10.7302/e1f1-3d97,
+  <span class="nw">CC BY-NC 4.0</span>.
   [3] Ultralytics YOLO26.
   [4] A. Aldhahri, E. Saif, H. Ali, M. Alsayed, F. Alshareef. Harnessing Computer Vision and Deep Learning to Monitor
-  Coral Reef Health. ETASR 15(4), 2025, doi:10.48084/etasr.10324; Marjan dataset, Roboflow Universe, CC BY 4.0.</div>
+  Coral Reef Health. ETASR 15(4), 2025, doi:10.48084/etasr.10324; Marjan dataset, Roboflow Universe,
+  <span class="nw">CC BY 4.0</span>.</div>
   {f'<div class="link">{escape(code_url.removeprefix("https://"))}</div>' if code_url else ""}
 </footer>
 </body></html>"""
