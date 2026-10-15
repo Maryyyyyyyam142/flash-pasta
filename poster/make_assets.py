@@ -62,14 +62,17 @@ def coral_thumbs(size=420):
             corners = [arr[:24, :24], arr[:24, -24:], arr[-24:, :24], arr[-24:, -24:]]
             if min(c.mean() for c in corners) < 20:
                 continue  # black fill from the dataset's rotation augmentation
-            if True:
-                d = ImageDraw.Draw(img)
-                for _, x, y, w, h in ([float(v) for v in r] for r in rows):
-                    d.rectangle([(x - w / 2) * size, (y - h / 2) * size, (x + w / 2) * size, (y + h / 2) * size],
-                                outline="white", width=5)
-                img.crop((0, size // 8, size, size - size // 8)).save(FIG / f"coral_{name}.jpg", quality=90)  # 4:3
-                print(f"coral {name}: {lbl.stem}")
-                break
+            top = size // 8
+            img = img.crop((0, top, size, size - top))  # 4:3
+            d = ImageDraw.Draw(img)
+            for _, x, y, w, h in ([float(v) for v in r] for r in rows):
+                # clamp to the crop so boxes that reach the frame edge keep all four sides
+                d.rectangle([max(0, (x - w / 2) * size), max(0, (y - h / 2) * size - top),
+                             min(img.width - 1, (x + w / 2) * size), min(img.height - 1, (y + h / 2) * size - top)],
+                            outline="white", width=5)
+            img.save(FIG / f"coral_{name}.jpg", quality=90)
+            print(f"coral {name}: {lbl.stem}")
+            break
 
 
 def qr():
