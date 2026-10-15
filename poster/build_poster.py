@@ -168,11 +168,16 @@ def build():
     a = json.loads((POSTER / "authors.json").read_text())
     people = a["authors"]
     affils = list(dict.fromkeys(x["affiliation"] for x in people if x.get("affiliation")))  # optional
-    mark = lambda x: (f"<sup>{affils.index(x['affiliation']) + 1}</sup>"  # noqa: E731
-                      if len(affils) > 1 and x.get("affiliation") else "")
-    names_html = ", ".join(f"{escape(x['name'])}{mark(x)}" for x in people)
+    # Superscripts link each name to its affiliation, or to its email when there are no affiliations
+    if len(affils) > 1:
+        marks = [f"<sup>{affils.index(x['affiliation']) + 1}</sup>" if x.get("affiliation") else "" for x in people]
+    elif not affils and len(people) > 1:
+        marks = [f"<sup>{i + 1}</sup>" for i in range(len(people))]
+    else:
+        marks = [""] * len(people)
+    names_html = ", ".join(f"{escape(x['name'])}{m}" for x, m in zip(people, marks))
     affil_html = " · ".join((f"<sup>{i + 1}</sup>" if len(affils) > 1 else "") + escape(af) for i, af in enumerate(affils))
-    email_html = " · ".join(escape(x["email"]) for x in people)
+    email_html = " · ".join(("" if affils else m) + escape(x["email"]) for x, m in zip(people, marks))
     code_url = a.get("code_url", "")
     has_qr = code_url and (ROOT / "figures/qr_code.svg").exists()
     has_example = (ROOT / "figures/example_pasta.jpg").exists()
