@@ -167,8 +167,9 @@ def build():
     n = numbers()
     a = json.loads((POSTER / "authors.json").read_text())
     people = a["authors"]
-    affils = list(dict.fromkeys(x["affiliation"] for x in people))
-    mark = (lambda x: f"<sup>{affils.index(x['affiliation']) + 1}</sup>") if len(affils) > 1 else (lambda x: "")
+    affils = list(dict.fromkeys(x["affiliation"] for x in people if x.get("affiliation")))  # optional
+    mark = lambda x: (f"<sup>{affils.index(x['affiliation']) + 1}</sup>"  # noqa: E731
+                      if len(affils) > 1 and x.get("affiliation") else "")
     names_html = ", ".join(f"{escape(x['name'])}{mark(x)}" for x in people)
     affil_html = " · ".join((f"<sup>{i + 1}</sup>" if len(affils) > 1 else "") + escape(af) for i, af in enumerate(affils))
     email_html = " · ".join(escape(x["email"]) for x in people)
@@ -317,7 +318,7 @@ footer .refs {{ flex: 1; }}
   <div class="titles">
     <h1><span class="brand">FlashPASTA</span>: taking Fourier augmentation<br>off the CPU critical path</h1>
     <div class="authors">{names_html}</div>
-    <div class="affil">{affil_html}</div>
+    {f'<div class="affil">{affil_html}</div>' if affils else ""}
     <div class="affil">{email_html}</div>
   </div>
   <div class="right">
