@@ -19,6 +19,7 @@ the official implementation up to floating-point rounding.
 | Cached noise mask | The per-frequency noise level is built once per image size |
 | No amplitude/phase split | `abs(F) * eps * exp(i*angle(F)) == F * eps`, so `abs`, `angle` and `exp` are skipped |
 | Real FFT | `Re(IFFT(F * eps)) == IRFFT(F * (eps(f) + eps(-f)) / 2)`, so half the spectrum and half the random numbers suffice |
+| float32 throughout | The official code computes the noise and inverse FFT in float64; float32 stays within 3.3×10⁻⁶ of its output |
 
 The real-FFT path draws its noise with the variance of the symmetrised reference noise
 (and keeps it Hermitian-symmetric in the self-conjugate columns), so the output
@@ -43,22 +44,24 @@ YOLO26s, batch 16 (8 at 1280 px), one RTX A5000, mixed precision, mosaic off so 
 sees identical inputs. Steady-state epoch; "GPU waiting" is the share of the training loop
 spent waiting for the next batch.
 
-| Setup | Official, CPU workers | FlashPASTA, GPU | Speed-up |
-|---|---|---|---|
-| 640 px, 8 workers | 41.6 img/s, GPU waiting 77% | 173.8 img/s, GPU waiting 0.2% | 4.2× |
-| 640 px, 16 workers | 78.5 img/s, GPU waiting 55% | 173.8 img/s, GPU waiting 0.3% | 2.2× |
-| 1280 px, 8 workers | 7.1 img/s, GPU waiting 85% | 46.0 img/s, GPU waiting 0.1% | 6.4× |
+| Setup | Official, CPU workers | FlashPASTA, CPU workers | FlashPASTA, GPU | GPU vs official |
+|---|---|---|---|---|
+| 640 px, 2 workers | 11.7 img/s, 94% waiting | 75.7 img/s, 59% waiting | 156.9 img/s, 12% waiting | 13.5× |
+| 640 px, 8 workers | 41.6 img/s, 77% waiting | 176.1 img/s, 0.4% waiting | 173.8 img/s, 0.2% waiting | 4.2× |
+| 640 px, 16 workers | 78.5 img/s, 55% waiting | 175.5 img/s, 0.3% waiting | 173.8 img/s, 0.3% waiting | 2.2× |
+| 1280 px, 8 workers | 7.1 img/s, 85% waiting | 46.8 img/s, 0.2% waiting | 46.0 img/s, 0.1% waiting | 6.4× |
 
-Without PASTA the same model trains at about 176 img/s (640 px) and 48 img/s (1280 px), so
-FlashPASTA costs about 1–4% of training throughput, while the official implementation never
-reaches the GPU's rate even with all 32 cores.
+Without PASTA the same model trains at up to 177 img/s (640 px) and 48 img/s (1280 px). On the
+GPU, FlashPASTA costs at most 3% of that with any number of workers (with 2 workers, JPEG
+decoding is the limit with or without PASTA). In CPU workers it keeps up from 8 workers per
+GPU, and the official implementation never keeps up, even with all 32 cores.
 
 ### Case study: Red Sea coral reefs (Marjan dataset)
 
 Same setup on 9,498 real 640×640 underwater images of healthy, bleached and dead coral [4],
-8 CPU workers: the official implementation trains at 46.9 img/s with the GPU waiting for data
-74% of the time; FlashPASTA trains at 169.1 img/s with 0.2% waiting (3.6×), cutting an epoch
-from 3.4 to 0.9 minutes.
+8 CPU workers: the official implementation trains at 44.4 img/s with the GPU waiting for data
+75% of the time; FlashPASTA trains at 165.5 img/s on the GPU (3.7×) and 177.4 img/s in CPU
+workers (4.0×), with under 0.5% waiting, cutting an epoch from 3.6 to about 1 minute.
 
 All raw numbers are in `results/` and on the poster (`poster/poster.pdf`).
 
