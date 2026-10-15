@@ -136,6 +136,12 @@ PIPELINE_SVG = """
 def build():
     n = numbers()
     a = json.loads((POSTER / "authors.json").read_text())
+    people = a["authors"]
+    affils = list(dict.fromkeys(x["affiliation"] for x in people))
+    mark = (lambda x: f"<sup>{affils.index(x['affiliation']) + 1}</sup>") if len(affils) > 1 else (lambda x: "")
+    names_html = ", ".join(f"{escape(x['name'])}{mark(x)}" for x in people)
+    affil_html = " · ".join((f"<sup>{i + 1}</sup>" if len(affils) > 1 else "") + escape(af) for i, af in enumerate(affils))
+    email_html = " · ".join(escape(x["email"]) for x in people)
     has_train = "t_speedup" in n
 
     tiles = [
@@ -211,8 +217,9 @@ th {{ color: #52514e; font-weight: 600; }}
 <header>
   <div>
     <h1>PASTA at GPU speed: taking Fourier augmentation<br>off the CPU critical path</h1>
-    <div class="authors">{escape(a['authors'])}</div>
-    <div class="affil">{escape(a['affiliation'])} · {escape(a['email'])}</div>
+    <div class="authors">{names_html}</div>
+    <div class="affil">{affil_html}</div>
+    <div class="affil">{email_html}</div>
   </div>
   <div class="conf"><b>Saudi HPC/AI 2026</b><br>KAUST, 26–28 October<br>Methods that improve<br>computational efficiency</div>
 </header>
