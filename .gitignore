@@ -6,6 +6,7 @@ __pycache__/
 # Datasets and model weights (download separately, see README)
 data/raw/
 data/sim10k/
+data/marjan/
 data/*.yaml
 weights/
 *.pt
