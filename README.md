@@ -50,7 +50,7 @@ spent waiting for the next batch.
 | 1280 px, 8 workers | 7.1 img/s, GPU waiting 85% | 46.0 img/s, GPU waiting 0.1% | 6.4× |
 
 Without PASTA the same model trains at about 176 img/s (640 px) and 48 img/s (1280 px), so
-FlashPASTA costs about 1–4% of training throughput, while the official implementation never
+FlashPASTA costs about 1–5% of training throughput, while the official implementation never
 reaches the GPU's rate even with all 32 cores.
 
 ### Case study: Red Sea coral reefs (Marjan dataset)
