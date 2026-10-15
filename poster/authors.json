@@ -1,6 +1,6 @@
 {
-  "authors": "Maryam Saif",
-  "affiliation": "SDAIA",
-  "email": "maryam.saif@gmail.com",
-  "code_url": ""
+  "authors": [
+    {"name": "Maryam Saif", "affiliation": "SDAIA", "email": "maryam.saif@gmail.com"}
+  ],
+  "code_url": "https://github.com/Maryyyyyyyam142/flash-pasta"
 }
