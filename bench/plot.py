@@ -156,12 +156,12 @@ def fig_loader():
         if sz == "640":
             dmd = demand(runs, 640)
             if dmd:
-                ax.axhline(dmd, color=INK2, lw=1.5, ls=":", zorder=2)
-                ax.text(ws[0], dmd * 1.12, f"YOLO26s training needs {dmd:,.0f}/s", color=INK2, fontsize=18)
+                ax.axhline(dmd, color=INK, lw=2, ls=":", zorder=2, label=f"YOLO26s trains at {dmd:,.0f}/s")
         ax.set_title("Resized to 640" if sz == "640" else "Native 1914×1052")
     axes[0][0].set_ylabel("Images / s delivered (log)")
     handles, labels = axes[0][0].get_legend_handles_labels()
-    fig.legend(handles, labels, loc="upper center", ncol=2, bbox_to_anchor=(0.5, 1.16), fontsize=18,
+    fig.legend(handles, labels, loc="upper center", ncol=3 if len(handles) > 4 else 2,
+               bbox_to_anchor=(0.5, 1.16), fontsize=18,
                handlelength=1.6, columnspacing=1.2)
     save(fig, "fig2_loader")
 

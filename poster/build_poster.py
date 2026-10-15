@@ -197,10 +197,8 @@ def build():
     <tr><td>One Sim10k epoch (10k images)</td><td>{fmt(n['t_epoch_off'], 1)} min</td><td><b>{fmt(n['t_epoch_gpu'], 1)} min</b></td></tr>
     <tr><td>100 epochs (projected)</td><td>{fmt(n['t_100ep_off'], 1)} h</td><td><b>{fmt(n['t_100ep_gpu'], 1)} h</b></td></tr>
   </table>
-  <p>PASTA on the GPU costs {fmt(n['t_gpu_pasta_ms'], 1)} ms per batch. Even with {n['t_off_best_w']} workers the
-  official version reaches only {fmt(n['t_off_best'])} img/s, while the GPU trains at up to
-  {fmt(n['t_demand'])} img/s; the GPU version gets within 10% of that with
-  {n['t_gpu_min_w'] if n.get('t_gpu_min_w') else '—'} workers.</p>"""
+  <p>GPU PASTA adds {fmt(n['t_gpu_pasta_ms'], 1)} ms per batch. The official version never feeds the GPU's
+  {fmt(n['t_demand'])} img/s, not even with {n['t_off_best_w']} workers ({fmt(n['t_off_best'])} img/s).</p>"""
     else:
         train_html = "<p class='pending'>Training runs in progress.</p>"
 
@@ -213,7 +211,6 @@ def build():
         coral_rows = f"""
   <table class="res">
     <tr><th>{HEADLINE_WORKERS} CPU workers, 640 px</th><th class="off">Official, CPU</th><th class="gpu">FlashPASTA, GPU</th></tr>
-    <tr><td>Training throughput</td><td>{fmt(n['m_off'])} img/s</td><td><b>{fmt(n['m_gpu'])} img/s</b></td></tr>
     <tr><td>GPU waiting for data</td><td>{fmt(n['m_off_stall'])}%</td><td><b>{fmt(n['m_gpu_stall'], 1)}%</b></td></tr>
     <tr><td>One epoch ({fmt(n['m_images'])} images)</td><td>{fmt(n['m_epoch_off'], 1)} min</td><td><b>{fmt(n['m_epoch_gpu'], 1)} min</b></td></tr>
   </table>"""
@@ -224,13 +221,12 @@ def build():
     thumbs = "".join(f'<div><img src="../figures/coral_{c}.jpg"><div class="lbl">{c.capitalize()}</div></div>'
                      for c in ("healthy", "bleached", "dead") if (ROOT / f"figures/coral_{c}.jpg").exists())
     coral_html = f"""<section><h2>{coral_head}</h2>
-  <p>Real underwater imagery: the Marjan dataset [4], {fmt(n['m_images'])} training images of healthy,
-  bleached and dead coral, same YOLO26s setup.</p>
+  <p>Real underwater images, Marjan dataset [4] ({fmt(n['m_images'])} train), same setup.</p>
   <div class="corals">{thumbs}</div>
   {coral_rows}</section>"""
 
     loader_claim = (f"GPU PASTA is nearly free" if n.get("ld_gpu_frac", 0) >= 0.9 else "PASTA on CPU vs GPU")
-    dotted_note = " Dotted line: the rate YOLO26s trains at when data is never late." if has_train else ""
+    dotted_note = ""
     train_claim = (f"YOLO training: {fmt(n['t_speedup'], 1)}× faster epochs" if has_train
                    else "YOLO training on Sim10k")
 
