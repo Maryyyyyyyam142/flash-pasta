@@ -93,7 +93,7 @@ converts back.
 | `bench/bench_kernel.py` | Throughput of the transform alone: CPU process pool vs GPU |
 | `bench/bench_loader.py` | Images/s a DataLoader delivers vs number of CPU workers |
 | `bench/train_yolo.py` | End-to-end YOLO training with per-epoch timing and GPU utilisation |
-| `bench/plot.py`, `poster/build_poster.py` | Figures and the A0 poster, generated from `results/` |
+| `bench/plot.py`, `poster/build_poster.py` | Figures and the 140 × 73 cm e-poster, generated from `results/` |
 | `data/prepare_sim10k.py` | Sim10k (Pascal VOC) to YOLO format, car class only |
 | `data/make_standin.py` | Same-size placeholder images for smoke-testing the pipeline |
 | `run_all.sh` | Sim10k benchmark: loader sweep and training sweep |

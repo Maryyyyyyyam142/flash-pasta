@@ -1,10 +1,13 @@
-"""Build the one-page A0 landscape poster (poster/poster.pdf) from results/*.json and figures/*.svg.
+"""Build the one-page e-poster (poster/poster.pdf) from results/*.json and figures/*.svg.
 
-All numbers in the text are computed from the result files, so re-running the
-benchmarks and this script keeps the poster consistent.
+Follows the conference's e-poster rules: 140 x 73 cm landscape, one page, no text under
+24 pt, photos embedded at 96 dpi, PDF of at most 5 MB. All numbers in the text are computed
+from the result files, so re-running the benchmarks and this script keeps the poster consistent.
 
 Usage: .venv/bin/python bench/plot.py && .venv/bin/python poster/build_poster.py
 """
+import base64
+import io
 import json
 import math
 import re
@@ -15,6 +18,12 @@ ROOT = Path(__file__).resolve().parents[1]
 RES, POSTER = ROOT / "results", ROOT / "poster"
 HEADLINE_WORKERS = 8  # CPU cores per GPU on a typical shared HPC GPU node
 RES_METHODS = [("off", "off", "Official, CPU"), ("ours", "cpu", "FlashPASTA, CPU"), ("gpu", "gpu", "FlashPASTA, GPU")]
+PAGE_MM = (1400, 730)
+MARGIN_MM = 28
+COLS_MM = (318, 343, 343, 298)  # the middle two hold bench/plot.py's figures, drawn for 13.5 in (343 mm)
+MIN_PT = 24  # smallest text the e-poster rules recommend for reading at 3-5 ft
+IMAGE_DPI = 96
+MAX_BYTES = 5_000_000
 
 
 def load(name):
@@ -132,33 +141,34 @@ def numbers():
     return n
 
 
+# 900 units wide, about the first column's width in pt, so font-size 25 shows at 25 pt
 PIPELINE_SVG = """
-<svg viewBox="0 0 1000 300" xmlns="http://www.w3.org/2000/svg" font-family="Noto Sans" font-size="25">
-  <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+<svg viewBox="0 0 900 330" xmlns="http://www.w3.org/2000/svg" font-family="Noto Sans" font-size="27">
+  <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
     <path d="M0,0 L10,5 L0,10 z" fill="#52514e"/></marker></defs>
-  <text x="0" y="28" font-weight="700" fill="#0b0b0b">Official</text>
-  <rect x="0" y="42" width="640" height="96" rx="10" fill="#f4f3f0" stroke="#d6d5d0"/>
-  <text x="14" y="70" fill="#52514e" font-size="21">each CPU worker, one image at a time</text>
-  <rect x="14" y="82" width="150" height="44" rx="6" fill="#fff" stroke="#bdbcb6"/><text x="89" y="112" text-anchor="middle">decode</text>
-  <rect x="182" y="82" width="150" height="44" rx="6" fill="#fff" stroke="#bdbcb6"/><text x="257" y="112" text-anchor="middle">resize</text>
-  <rect x="350" y="82" width="276" height="44" rx="6" fill="#fbe1d6" stroke="#eb6834" stroke-width="2.5"/>
-  <text x="488" y="112" text-anchor="middle">PASTA: FFT, float64</text>
-  <line x1="644" y1="104" x2="700" y2="104" stroke="#52514e" stroke-width="3" marker-end="url(#ar)"/>
-  <rect x="706" y="42" width="290" height="96" rx="10" fill="#f4f3f0" stroke="#d6d5d0"/>
-  <text x="720" y="70" fill="#52514e" font-size="21">GPU</text>
-  <rect x="720" y="82" width="262" height="44" rx="6" fill="#fff" stroke="#bdbcb6"/><text x="851" y="112" text-anchor="middle">train step</text>
+  <text x="0" y="30" font-weight="700" font-size="28" fill="#0b0b0b">Official</text>
+  <rect x="0" y="44" width="572" height="112" rx="10" fill="#f4f3f0" stroke="#d6d5d0"/>
+  <text x="14" y="78" fill="#52514e" font-size="25">each CPU worker, one image at a time</text>
+  <rect x="14" y="92" width="125" height="50" rx="6" fill="#fff" stroke="#bdbcb6"/><text x="76.5" y="126" text-anchor="middle">decode</text>
+  <rect x="151" y="92" width="125" height="50" rx="6" fill="#fff" stroke="#bdbcb6"/><text x="213.5" y="126" text-anchor="middle">resize</text>
+  <rect x="288" y="92" width="270" height="50" rx="6" fill="#fbe1d6" stroke="#eb6834" stroke-width="2.5"/>
+  <text x="423" y="126" text-anchor="middle">PASTA: FFT, float64</text>
+  <line x1="580" y1="117" x2="704" y2="117" stroke="#52514e" stroke-width="3" marker-end="url(#ar)"/>
+  <rect x="712" y="44" width="188" height="112" rx="10" fill="#f4f3f0" stroke="#d6d5d0"/>
+  <text x="726" y="78" fill="#52514e" font-size="25">GPU</text>
+  <rect x="726" y="92" width="160" height="50" rx="6" fill="#fff" stroke="#bdbcb6"/><text x="806" y="126" text-anchor="middle">train step</text>
 
-  <text x="0" y="186" font-weight="700" fill="#0b0b0b">FlashPASTA</text>
-  <rect x="0" y="200" width="346" height="96" rx="10" fill="#f4f3f0" stroke="#d6d5d0"/>
-  <text x="14" y="228" fill="#52514e" font-size="21">each CPU worker</text>
-  <rect x="14" y="240" width="150" height="44" rx="6" fill="#fff" stroke="#bdbcb6"/><text x="89" y="270" text-anchor="middle">decode</text>
-  <rect x="182" y="240" width="150" height="44" rx="6" fill="#fff" stroke="#bdbcb6"/><text x="257" y="270" text-anchor="middle">resize</text>
-  <line x1="350" y1="262" x2="406" y2="262" stroke="#52514e" stroke-width="3" marker-end="url(#ar)"/>
-  <rect x="412" y="200" width="584" height="96" rx="10" fill="#f4f3f0" stroke="#d6d5d0"/>
-  <text x="426" y="228" fill="#52514e" font-size="21">GPU, whole batch at once</text>
-  <rect x="426" y="240" width="280" height="44" rx="6" fill="#d5e5f9" stroke="#2a78d6" stroke-width="2.5"/>
-  <text x="566" y="270" text-anchor="middle">PASTA: rFFT, float32</text>
-  <rect x="720" y="240" width="262" height="44" rx="6" fill="#fff" stroke="#bdbcb6"/><text x="851" y="270" text-anchor="middle">train step</text>
+  <text x="0" y="204" font-weight="700" font-size="28" fill="#0b0b0b">FlashPASTA</text>
+  <rect x="0" y="218" width="290" height="112" rx="10" fill="#f4f3f0" stroke="#d6d5d0"/>
+  <text x="14" y="252" fill="#52514e" font-size="25">each CPU worker</text>
+  <rect x="14" y="266" width="125" height="50" rx="6" fill="#fff" stroke="#bdbcb6"/><text x="76.5" y="300" text-anchor="middle">decode</text>
+  <rect x="151" y="266" width="125" height="50" rx="6" fill="#fff" stroke="#bdbcb6"/><text x="213.5" y="300" text-anchor="middle">resize</text>
+  <line x1="298" y1="291" x2="412" y2="291" stroke="#52514e" stroke-width="3" marker-end="url(#ar)"/>
+  <rect x="420" y="218" width="480" height="112" rx="10" fill="#f4f3f0" stroke="#d6d5d0"/>
+  <text x="434" y="252" fill="#52514e" font-size="25">GPU, whole batch at once</text>
+  <rect x="434" y="266" width="280" height="50" rx="6" fill="#d5e5f9" stroke="#2a78d6" stroke-width="2.5"/>
+  <text x="574" y="300" text-anchor="middle">PASTA: rFFT, float32</text>
+  <rect x="726" y="266" width="160" height="50" rx="6" fill="#fff" stroke="#bdbcb6"/><text x="806" y="300" text-anchor="middle">train step</text>
 </svg>
 """
 
@@ -232,7 +242,7 @@ def build():
 
     # The QR code is also a link, for readers of the PDF
     qr_html = (f'<div class="qr"><a href="{escape(code_url)}"><img src="../figures/qr_code.svg"></a>'
-               f"<div>Code &amp; data</div></div>") if has_qr else ""
+               f'<div><b>Code &amp; data</b><br>{escape(re.sub(r"^https?://", "", code_url))}</div></div>') if has_qr else ""
 
     short_gpu = n.get("gpu_name", "").replace("NVIDIA ", "")
     short_cpu = re.sub(r"^AMD Ryzen |^Intel\(R\) ", "", n.get("cpu_name", ""))
@@ -254,81 +264,81 @@ def build():
     train_claim = (f"YOLO training: {fmt(n['t_speedup'], 1)}× faster epochs" if has_train
                    else "YOLO training on Sim10k")
 
+    gap_mm = (PAGE_MM[0] - 2 * MARGIN_MM - sum(COLS_MM)) / (len(COLS_MM) - 1)
+    cols_css = " ".join(f".col:nth-child({i}) {{ width: {w}mm; }}" for i, w in enumerate(COLS_MM, start=1))
     html = f"""<!doctype html><html><head><meta charset="utf-8"><title>FlashPASTA poster</title>
 <style>
-@page {{ size: 1189mm 841mm; margin: 0; }}
+@page {{ size: {PAGE_MM[0]}mm {PAGE_MM[1]}mm; margin: 0; }}
 * {{ box-sizing: border-box; }}
 html, body {{ margin: 0; }}
-body {{ width: 1189mm; height: 841mm; position: relative; overflow: hidden; font-family: 'Noto Sans', sans-serif;
-       font-size: 29pt; line-height: 1.32; color: #0b0b0b; background: #fff; }}
-sup {{ line-height: 0; font-size: 0.7em; }}
+body {{ width: {PAGE_MM[0]}mm; height: {PAGE_MM[1]}mm; position: relative; overflow: hidden;
+       font-family: 'Noto Sans', sans-serif; font-size: 32pt; line-height: 1.3; color: #0b0b0b; background: #fff; }}
+sup {{ line-height: 0; font-size: 0.86em; }}
 b {{ font-weight: 700; }}
-.lead {{ font-size: 29pt; font-weight: 600; color: #184f95; margin-bottom: 3mm; }}
-header {{ background: #184f95; color: #fff; padding: 14mm 30mm 12mm; position: relative; }}
-header .titles {{ margin-right: 330mm; }}
-header .right {{ position: absolute; right: 30mm; top: 0; bottom: 0; display: flex; align-items: center; gap: 12mm; }}
+header {{ background: #184f95; color: #fff; padding: 11mm {MARGIN_MM}mm 10mm; position: relative; }}
+header .titles {{ margin-right: 230mm; }}
+header .right {{ position: absolute; right: {MARGIN_MM}mm; top: 0; bottom: 0; display: flex; align-items: center; gap: 12mm; }}
 .brand {{ color: #9ec5f4; }}
-h1 {{ font-size: 80pt; line-height: 1.04; margin: 0 0 6mm; letter-spacing: -0.5pt; font-weight: 700; }}
+h1 {{ font-size: 80pt; line-height: 1.04; margin: 0 0 4mm; letter-spacing: -0.5pt; font-weight: 700; }}
 .authors {{ font-size: 36pt; font-weight: 600; }}
-.affil {{ font-size: 27pt; color: #cde2fb; }}
-.conf {{ width: 240mm; text-align: right; font-size: 30pt; color: #cde2fb; line-height: 1.35; white-space: nowrap; }}
+.affil {{ font-size: 28pt; color: #cde2fb; }}
+.conf {{ text-align: right; font-size: 30pt; color: #cde2fb; line-height: 1.35; white-space: nowrap; }}
 .conf b {{ color: #fff; font-size: 38pt; }}
-.qr {{ background: #fff; color: #184f95; border-radius: 3mm; padding: 3mm 3mm 2mm; text-align: center;
-       font-size: 20pt; font-weight: 600; }}
+.qr {{ display: flex; align-items: center; gap: 6mm; margin: 2mm 0 4mm; color: #184f95; font-size: 28pt; line-height: 1.3; }}
 .qr a, .qr img {{ display: block; }}
-.qr img {{ width: 56mm; height: 56mm; }}
-main {{ padding: 9mm 30mm 0; }}
-.tiles {{ display: flex; gap: 10mm; margin-bottom: 9mm; }}
-.tile {{ flex: 1; background: #f4f3f0; border-top: 2.5mm solid #2a78d6; border-radius: 0 0 3mm 3mm; padding: 5mm 7mm 6mm; }}
-.tile .big {{ font-size: 68pt; font-weight: 700; color: #184f95; line-height: 1.05; }}
-.tile .cap {{ font-size: 25pt; color: #52514e; line-height: 1.25; }}
-.cols {{ display: flex; gap: 16mm; align-items: flex-start; }}
-.col {{ flex: 1; }}
+.qr img {{ width: 76mm; height: 76mm; }}
+main {{ padding: 9mm {MARGIN_MM}mm 0; }}
+.tiles {{ display: flex; gap: {gap_mm:g}mm; margin-bottom: 9mm; }}
+.tile {{ flex: 1; background: #f4f3f0; border-top: 2.5mm solid #2a78d6; border-radius: 0 0 3mm 3mm; padding: 4mm 7mm 5mm; }}
+.tile .big {{ font-size: 64pt; font-weight: 700; color: #184f95; line-height: 1.05; }}
+.tile .cap {{ font-size: 27pt; color: #52514e; line-height: 1.25; }}
+.cols {{ display: flex; gap: {gap_mm:g}mm; align-items: flex-start; }}
+.col {{ flex: none; }}
+{cols_css}
 section {{ margin: 0 0 8mm; }}
 /*BALANCE*/
-.col.wide {{ flex: 1.08; }}
 h2 {{ font-size: 42pt; color: #184f95; margin: 0 0 4mm; padding-left: 5mm; border-left: 3mm solid #2a78d6;
       line-height: 1.15; }}
 p {{ margin: 0 0 3.5mm; }}
 ul {{ margin: 0 0 3mm; padding-left: 9mm; }} li {{ margin-bottom: 2mm; }}
 img.fig {{ width: 100%; display: block; margin: 1mm 0 2mm; }}
-.caption {{ font-size: 25pt; color: #3d3c39; line-height: 1.25; margin: 0; }}
+.caption {{ font-size: 27pt; color: #3d3c39; line-height: 1.25; margin: 0; }}
 .caption b {{ color: #0b0b0b; }}
 .example {{ display: flex; gap: 4mm; margin: 2mm 0 4mm; }}
 .example > div {{ flex: 1; }}
 .example img {{ width: 100%; display: block; border-radius: 2mm; }}
-.example .lbl {{ font-size: 24pt; color: #52514e; margin-top: 1mm; }}
+.example .lbl {{ font-size: 26pt; color: #52514e; margin-top: 1mm; }}
 .corals {{ display: flex; gap: 4mm; margin: 2mm 0 3mm; }}
 .corals > div {{ flex: 1; }}
 .corals img {{ width: 100%; display: block; border-radius: 2mm; }}
-.corals .lbl {{ font-size: 24pt; color: #52514e; margin-top: 1mm; text-align: center; }}
+.corals .lbl {{ font-size: 26pt; color: #52514e; margin-top: 1mm; text-align: center; }}
 svg.pipe {{ width: 100%; display: block; margin: 1mm 0 4mm; }}
-.eq {{ font-family: 'DejaVu Sans Mono', monospace; font-size: 25pt; background: #f4f3f0; padding: 3mm 4mm;
+.eq {{ font-family: 'DejaVu Sans Mono', monospace; font-size: 28pt; background: #f4f3f0; padding: 3mm 4mm;
        border-radius: 2mm; margin: 2mm 0 0; }}
-table {{ border-collapse: collapse; width: 100%; font-size: 27pt; margin: 2mm 0 4mm; }}
+table {{ border-collapse: collapse; width: 100%; font-size: 29pt; margin: 2mm 0 4mm; }}
 th, td {{ text-align: left; padding: 2mm 3mm; border-bottom: 0.5mm solid #d6d5d0; vertical-align: top; }}
 th {{ color: #52514e; font-weight: 600; }}
 td.num {{ text-align: right; font-weight: 700; color: #184f95; white-space: nowrap; }}
 table.res th.off {{ color: #c4501f; }} table.res th.cpu {{ color: #12805a; }} table.res th.gpu {{ color: #1c5cab; }}
-.box {{ background: #eaf2fc; border-radius: 3mm; padding: 6mm 7mm 3mm; }}
+.box {{ background: #eaf2fc; border-radius: 3mm; padding: 7mm 7mm 4mm; }}
 .box h2 {{ border-left: none; padding-left: 0; }}
-footer {{ position: absolute; left: 30mm; right: 30mm; bottom: 10mm; padding-top: 5mm;
+.box li {{ margin-bottom: 4mm; }}
+footer {{ position: absolute; left: {MARGIN_MM}mm; right: {MARGIN_MM}mm; bottom: 9mm; padding-top: 4mm;
           border-top: 0.6mm solid #d6d5d0; display: flex; gap: 20mm;
-          font-size: 20pt; color: #52514e; line-height: 1.3; }}
+          font-size: {MIN_PT}pt; color: #52514e; line-height: 1.3; }}
 footer .refs {{ flex: 1; }}
 .nw {{ white-space: nowrap; }}
 .pending {{ color: #b45309; }}
 </style></head><body>
 <header>
   <div class="titles">
-    <h1><span class="brand">FlashPASTA</span>: taking Fourier augmentation<br>off the CPU critical path</h1>
+    <h1><span class="brand">FlashPASTA</span>: taking Fourier augmentation off the CPU critical path</h1>
     <div class="authors">{names_html}</div>
     {f'<div class="affil">{affil_html}</div>' if affils else ""}
     <div class="affil">{email_html}</div>
   </div>
   <div class="right">
     <div class="conf"><b>Saudi HPC/AI 2026</b><br>KAUST · 26–28 October<br>Methods that improve<br>computational efficiency</div>
-    {qr_html}
   </div>
 </header>
 <main>
@@ -349,19 +359,12 @@ footer .refs {{ flex: 1; }}
     <li><b>Batched cuFFT on the GPU</b> after the batch is transferred</li>
     <li><b>Noise mask cached</b> per image size</li>
     <li><b>float32 throughout</b>{f", within {sci(n['eq_max_err'], 1)} of the official output" if 'eq_max_err' in n else ""}</li>
-    <li><b>F·ε replaces |F|·ε·e<sup>iφ</sup></b>: no abs, angle or exp</li>
+    <li><b>F·ε replaces |F|·ε·exp(iφ)</b>: no abs, angle or exp</li>
     <li><b>Half-size real FFT</b>, exact because only the real part is kept:</li>
   </ul>
   <div class="eq">Re IFFT(F·ε) = IRFFT(F·(ε(f)+ε(−f))/2)</div></section>
-  <section><h2>Same output as the official code</h2>
-  <table>
-    <tr><td>Same noise: largest pixel difference (float32)</td><td class="num">{sci(n['eq_max_err'], 1) if 'eq_max_err' in n else '—'}</td></tr>
-    <tr><td>8-bit pixels that change (by {fmt(n.get('eq_uint8_max'))} level)</td><td class="num">{100 * n.get('eq_uint8', 0):.3f}%</td></tr>
-    <tr><td>Sampled noise spread vs official</td><td class="num">{fmt(n.get('eq_std_lo'), 2)}–{fmt(n.get('eq_std_hi'), 2)}×</td></tr>
-    <tr><td>Output pixel spread vs official ({fmt(n.get('eq_px_draws'))} draws, median)</td><td class="num">{fmt(n.get('eq_px_std'), 2)}×</td></tr>
-  </table></section>
 </div>
-<div class="col wide">
+<div class="col">
   <section><h2>1 · PASTA alone: {fmt(n.get('k_speedup'))}× faster on one GPU</h2>
   <img class="fig" src="../figures/fig1_kernel.svg">
   <p class="caption"><b>Figure 1.</b> Augmentation only, no data loading. {escape(short_gpu)} vs
@@ -370,21 +373,31 @@ footer .refs {{ flex: 1; }}
   <img class="fig" src="../figures/fig2_loader.svg">
   <p class="caption"><b>Figure 2.</b> Images/s a PyTorch DataLoader delivers on Sim10k (JPEG decode →
   letterbox → PASTA) vs CPU workers.</p></section>
+</div>
+<div class="col">
+  <section><h2>3 · {train_claim}</h2>
+  <img class="fig" src="../figures/fig3_train.svg">
+  <p class="caption"><b>Figure 3.</b> YOLO26s [3], 640 px, batch 16, one RTX A5000, mixed precision; mosaic off so
+  every mode sees identical inputs.</p>
+  {train_html}</section>
+  <section><h2>Same output as the official code</h2>
+  <table>
+    <tr><td>Same noise: largest pixel difference (float32)</td><td class="num">{sci(n['eq_max_err'], 1) if 'eq_max_err' in n else '—'}</td></tr>
+    <tr><td>8-bit pixels that change (by {fmt(n.get('eq_uint8_max'))} level)</td><td class="num">{100 * n.get('eq_uint8', 0):.3f}%</td></tr>
+    <tr><td>Sampled noise spread vs official</td><td class="num">{fmt(n.get('eq_std_lo'), 2)}–{fmt(n.get('eq_std_hi'), 2)}×</td></tr>
+    <tr><td>Output pixel spread vs official ({fmt(n.get('eq_px_draws'))} draws, median)</td><td class="num">{fmt(n.get('eq_px_std'), 2)}×</td></tr>
+  </table></section>
+</div>
+<div class="col">
+{coral_html}
   <section class="box"><h2>Takeaways</h2><ul>
     <li>FlashPASTA on one GPU is {fmt(n.get('k_speedup'))}× faster than the official code on {n.get('maxp', 32)} CPU cores,
     with the same output up to floating-point rounding.</li>
     <li>On the GPU it costs ≤{fmt_max(n.get('t_gpu_cost'))}% of training speed with any number of workers;
     in CPU workers FlashPASTA needs {n.get('t_ours_min_w', '—')} to keep up.</li>
     <li>Restructuring ({fmt(n.get('k_alg'), 1)}× on one core) and the real-FFT identity ({fmt(n.get('k_rfft'), 1)}× on GPU)
-    apply to any Fourier-domain augmentation.</li></ul></section>
-</div>
-<div class="col wide">
-  <section><h2>3 · {train_claim}</h2>
-  <img class="fig" src="../figures/fig3_train.svg">
-  <p class="caption"><b>Figure 3.</b> YOLO26s [3], 640 px, batch 16, one RTX A5000, mixed precision; mosaic off so
-  every mode sees identical inputs.</p>
-  {train_html}</section>
-{coral_html}
+    apply to any Fourier-domain augmentation.</li></ul>
+  {qr_html}</section>
 </div>
 </div>
 </main>
@@ -400,12 +413,17 @@ footer .refs {{ flex: 1; }}
   <span class="nw">CC BY 4.0</span>.</div>
 </footer>
 </body></html>"""
-    html = html.replace("/*BALANCE*/", balance_css(html))
+    page = render(html).pages[0]._page_box  # first layout, measured to finish the page
+    check_text(page)
+    check_figures(page)
+    html = screen_jpegs(html.replace("/*BALANCE*/", balance_css(page)), page)
     out = POSTER / "poster.html"
     out.write_text(html)
     doc = render(html)
     assert len(doc.pages) == 1, f"poster overflows to {len(doc.pages)} pages"
-    doc.write_pdf(POSTER / "poster.pdf")
+    pdf = doc.write_pdf()
+    assert len(pdf) <= MAX_BYTES, f"poster.pdf would be {len(pdf) / 1e6:.1f} MB, over the {MAX_BYTES / 1e6:g} MB limit"
+    (POSTER / "poster.pdf").write_bytes(pdf)
     print("wrote", POSTER / "poster.pdf")
 
 
@@ -416,12 +434,50 @@ def render(html):
 
 
 PX_PER_MM = 96 / 25.4
+PX_PER_PT = 96 / 72
 
 
-def balance_css(html, max_gap_mm=30, bottom_pad_mm=6):
-    """Lay the page out once, then spread each column's spare height evenly between its sections,
-    so all columns end at the same line above the footer (WeasyPrint's column flexbox is unreliable)."""
-    page = render(html).pages[0]._page_box
+def images(page):
+    """(element, layout box) of each <img> on the page."""
+    for box in page.descendants():
+        el = getattr(box, "element", None)
+        if el is not None and el.tag == "img":
+            yield el, box
+
+
+def check_text(page):
+    """No text under MIN_PT anywhere in the HTML (the inline pipeline SVG is drawn at 25-28 pt)."""
+    small = sorted({box.text.strip() for box in page.descendants() if type(box).__name__ == "TextBox"
+                    and box.text.strip() and box.style["font_size"] < MIN_PT * PX_PER_PT - 0.01})
+    assert not small, f"text under {MIN_PT} pt: {small[:5]}"
+
+
+def check_figures(page):
+    """bench/plot.py draws each figure at its on-screen size; shown smaller, its 24 pt text would shrink."""
+    for el, box in images(page):
+        if "fig" in (el.get("class") or "").split():
+            drawn = float(re.search(r'width="([\d.]+)pt"', (POSTER / el.get("src")).read_text()).group(1)) * PX_PER_PT
+            assert box.width >= drawn - 0.5, f"{el.get('src')} is shown at {box.width / drawn:.0%} of its drawn size"
+
+
+def screen_jpegs(html, page):
+    """Embed each photo resampled to IMAGE_DPI at the size it is shown, as the e-poster rules ask."""
+    from PIL import Image
+
+    for el, box in images(page):
+        src = el.get("src")
+        if src.endswith(".jpg"):
+            img = Image.open(POSTER / src)
+            w = min(img.width, round(box.width * IMAGE_DPI / 96))  # layout widths are CSS px, 96 per inch
+            buf = io.BytesIO()
+            img.resize((w, round(img.height * w / img.width)), Image.LANCZOS).save(buf, "JPEG", quality=90)
+            html = html.replace(f'src="{src}"', f'src="data:image/jpeg;base64,{base64.b64encode(buf.getvalue()).decode()}"')
+    return html
+
+
+def balance_css(page, max_gap_mm=45, bottom_pad_mm=6):
+    """Spread each column's spare height evenly between its sections, so all columns end at
+    the same line above the footer (WeasyPrint's column flexbox is unreliable)."""
     first = {}
     for box in page.descendants():
         el = getattr(box, "element", None)

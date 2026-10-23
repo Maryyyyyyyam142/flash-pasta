@@ -1,7 +1,8 @@
 """Poster figures from results/*.json -> figures/*.svg (+ .png previews).
 
-Sized for an A0 landscape poster: each figure is drawn at its printed width
-(~14 in for a column) with 20-24 pt text, so nothing is scaled down on print.
+Sized for the 140 x 73 cm e-poster: each figure is drawn to fit one 13.5 in figure
+column with 24-28 pt text, so nothing is scaled down below the 24 pt minimum.
+Log axes read 1, 10, 100, 1k rather than 10^n with small exponents.
 
 Colour follows the method everywhere: ours on GPU = blue, official = orange,
 ours on CPU = aqua, no PASTA = grey dashed (reference line, not a method).
@@ -16,6 +17,7 @@ import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
+from matplotlib.ticker import FuncFormatter  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 RES, FIG = ROOT / "results", ROOT / "figures"
@@ -26,18 +28,20 @@ LABEL = {"gpu": "FlashPASTA, on GPU", "cpu_official": "Official, in CPU workers"
          "cpu_ours": "FlashPASTA, in CPU workers", "none": "No PASTA"}
 MODE_COLOR = {"gpu": C["gpu"], "cpu_official": C["official"], "cpu_ours": C["ours_cpu"], "none": C["none"]}
 MODES = ["none", "cpu_official", "cpu_ours", "gpu"]
-COL_W = 14.0  # inches, one poster column
+COL_W = 13.3  # inches: with the 0.1 in save padding, within the poster's 13.5 in figure column
 LEGEND_HANDLE = 3.0  # long enough that the dashed no-PASTA line reads as dashed beside the marker
 
 plt.rcParams.update({
-    "font.family": "Noto Sans", "font.size": 22, "axes.titlesize": 24, "axes.labelsize": 22,
-    "xtick.labelsize": 20, "ytick.labelsize": 20, "legend.fontsize": 20,
+    "font.family": "Noto Sans", "font.size": 26, "axes.titlesize": 28, "axes.labelsize": 26,
+    "xtick.labelsize": 24, "ytick.labelsize": 24, "legend.fontsize": 24,
     "axes.edgecolor": GRID, "axes.labelcolor": INK2, "xtick.color": INK2, "ytick.color": INK2,
     "text.color": INK, "axes.grid": True, "grid.color": GRID, "grid.linewidth": 1.0,
     "axes.axisbelow": True, "axes.spines.top": False, "axes.spines.right": False,
     "legend.frameon": False, "figure.facecolor": "white", "axes.facecolor": "white",
     "savefig.dpi": 150, "svg.fonttype": "path", "axes.titlelocation": "left", "axes.titlepad": 14,
     "svg.hashsalt": "flashpasta",  # stable element ids, so regenerated SVGs only differ where the plot does
+    # constrained layout keeps every label inside figsize, so no figure comes out wider than its column
+    "figure.constrained_layout.use": True, "figure.constrained_layout.wspace": 0.06,
 })
 
 
@@ -59,6 +63,16 @@ def log2_workers(ax, ws):
     ax.set_xticks(ws, [str(w) for w in ws])
     ax.minorticks_off()
     ax.set_xlabel("CPU data-loader workers")
+
+
+def plain_log(axis):
+    """Label a log axis 1, 10, 100, 1k: 10^n exponents would fall below the poster's 24 pt minimum."""
+    axis.set_major_formatter(FuncFormatter(lambda v, _: f"{v / 1000:g}k" if v >= 1000 else f"{v:g}"))
+
+
+def fig_legend(fig, handles, labels):
+    """One legend above the plots, two entries per row; constrained layout makes room for it."""
+    fig.legend(handles, labels, loc="outside upper center", ncol=2, handlelength=LEGEND_HANDLE, columnspacing=1.6)
 
 
 # ---------------------------------------------------------------- kernel
@@ -87,13 +101,13 @@ def fig_kernel():
         ("FlashPASTA, 1 GPU", kernel_best(rows, res, "ours_gpu_rfft2"), C["gpu"]),
     ]
     base = bars[1][1]
-    fig, (a, b) = plt.subplots(1, 2, figsize=(COL_W, 5.6), gridspec_kw={"width_ratios": [1.2, 1], "wspace": 0.55})
+    fig, (a, b) = plt.subplots(1, 2, figsize=(COL_W, 7.0), gridspec_kw={"width_ratios": [1.2, 1]})
     for i, (lab, v, col) in enumerate(bars):
         a.barh(i, v, color=col, height=0.66)
         txt = f"{v:,.0f}" if v >= 10 else f"{v:.1f}"
         if v > base * 1.5:
             txt += f"  ({v / base:,.0f}×)"
-        a.text(v * 1.15, i, txt, va="center", color=INK, fontsize=20)
+        a.text(v * 1.15, i, txt, va="center", color=INK, fontsize=24)
     a.set_yticks(range(len(bars)), [x[0] for x in bars])
     a.invert_yaxis()
     a.set_xscale("log")
@@ -110,12 +124,12 @@ def fig_kernel():
                                      ("ours_gpu_rfft2", None, C["gpu"], "FlashPASTA, 1 GPU")]:
         line(b, xs, [kernel_best(rows, r, variant, procs) for r in RES_ORDER], col, lab)
     b.set_yscale("log")
+    plain_log(b.yaxis)
     b.set_xticks(xs, [RES_NAME[r] for r in RES_ORDER])
     b.set_xlabel("Image size")
     b.set_ylabel("Images / s (log)")
     b.set_title("Across image sizes")
-    b.set_ylim(top=b.get_ylim()[1] * 30)
-    b.legend(loc="upper right", fontsize=18, handlelength=1.6, borderaxespad=0.1)
+    fig_legend(fig, *b.get_legend_handles_labels())  # the bars use the same colours
     save(fig, "fig1_kernel")
 
 
@@ -146,7 +160,7 @@ def fig_loader():
     for r in d["rows"]:
         by[(str(r["imgsz"]), r["mode"])].append((r["workers"], r["img_per_s"]))
     sizes = [s for s in ("640", "native") if any(k[0] == s for k in by)]
-    fig, axes = plt.subplots(1, len(sizes), figsize=(COL_W, 5.6), gridspec_kw={"wspace": 0.3}, squeeze=False)
+    fig, axes = plt.subplots(1, len(sizes), figsize=(COL_W, 8.4), squeeze=False)
     for ax, sz in zip(axes[0], sizes):
         ws = sorted({w for (s, _), pts in by.items() if s == sz for w, _ in pts})
         for mode in MODES:
@@ -154,6 +168,7 @@ def fig_loader():
             if pts:
                 line(ax, [p[0] for p in pts], [p[1] for p in pts], MODE_COLOR[mode], LABEL[mode], dashed=mode == "none")
         ax.set_yscale("log")
+        plain_log(ax.yaxis)
         log2_workers(ax, ws)
         if sz == "640":
             dmd = demand(runs, 640)
@@ -161,10 +176,7 @@ def fig_loader():
                 ax.axhline(dmd, color=INK, lw=2, ls=":", zorder=2, label=f"YOLO26s trains at {dmd:,.0f}/s")
         ax.set_title("Resized to 640" if sz == "640" else "Native 1914×1052")
     axes[0][0].set_ylabel("Images / s delivered (log)")
-    handles, labels = axes[0][0].get_legend_handles_labels()
-    fig.legend(handles, labels, loc="upper center", ncol=3 if len(handles) > 4 else 2,
-               bbox_to_anchor=(0.5, 1.16), fontsize=18,
-               handlelength=LEGEND_HANDLE, columnspacing=1.2)
+    fig_legend(fig, *axes[0][0].get_legend_handles_labels())
     save(fig, "fig2_loader")
 
 
@@ -174,7 +186,7 @@ def fig_train():
     if not runs:
         return
     ws = sorted({r["workers"] for r in runs})
-    fig, (a, b) = plt.subplots(1, 2, figsize=(COL_W, 5.6), gridspec_kw={"wspace": 0.3})
+    fig, (a, b) = plt.subplots(1, 2, figsize=(COL_W, 8.6))
     for mode in MODES:
         pts = sorted((r["workers"], r["img_per_s_global"], r["data_wait_frac"]) for r in runs if r["pasta_mode"] == mode)
         if not pts:
@@ -190,9 +202,7 @@ def fig_train():
     b.set_ylabel("GPU waiting for data (%)")
     b.set_ylim(0, 100)
     b.set_title("Data-loader stall")
-    handles, labels = a.get_legend_handles_labels()
-    fig.legend(handles, labels, loc="upper center", ncol=2, bbox_to_anchor=(0.5, 1.16), fontsize=18,
-               handlelength=LEGEND_HANDLE, columnspacing=1.2)
+    fig_legend(fig, *a.get_legend_handles_labels())
     save(fig, "fig3_train")
 
 
@@ -203,7 +213,7 @@ def fig_scaling():
     if not multi:
         return
     imgsz, workers = multi[0]["imgsz"], multi[0]["workers"]
-    fig, ax = plt.subplots(figsize=(COL_W / 2, 5.6))
+    fig, ax = plt.subplots(figsize=(COL_W / 2, 7.0))
     x, ticks = 0, []
     for mode in ["cpu_official", "gpu"]:
         for n in (1, 2):
@@ -213,7 +223,7 @@ def fig_scaling():
                 continue
             v = r[0]["img_per_s_global"]
             ax.bar(x, v, color=MODE_COLOR[mode], width=0.7)
-            ax.text(x, v * 1.02, f"{v:,.0f}", ha="center", va="bottom", fontsize=20)
+            ax.text(x, v * 1.02, f"{v:,.0f}", ha="center", va="bottom", fontsize=24)
             ticks.append((x, f"{n} GPU{'s' if n > 1 else ''}"))
             x += 1
         x += 0.6
