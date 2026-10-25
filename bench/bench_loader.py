@@ -23,8 +23,8 @@ import torch
 from torch.utils.data import DataLoader, Dataset
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from pasta_gpu.pasta import PASTA, pasta_uint8  # noqa: E402
-from pasta_gpu.reference_official import PASTA as OfficialPASTA  # noqa: E402
+from flashpasta.pasta import PASTA, pasta_uint8  # noqa: E402
+from flashpasta.reference_official import PASTA as OfficialPASTA  # noqa: E402
 
 ALPHA, BETA, K = 3.0, 0.25, 2
 

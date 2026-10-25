@@ -22,8 +22,8 @@ from pathlib import Path
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from pasta_gpu.pasta import PASTA  # noqa: E402
-from pasta_gpu.reference_official import PASTA as OfficialPASTA  # noqa: E402
+from flashpasta.pasta import PASTA  # noqa: E402
+from flashpasta.reference_official import PASTA as OfficialPASTA  # noqa: E402
 
 ALPHA, BETA, K = 3.0, 0.25, 2
 RESOLUTIONS = {"640x640": (640, 640), "1280x1280": (1280, 1280), "sim10k_1052x1914": (1052, 1914), "4k_2160x3840": (2160, 3840)}

@@ -22,8 +22,8 @@ from ultralytics.data.dataset import YOLODataset
 from ultralytics.models.yolo.detect import DetectionTrainer
 from ultralytics.utils import RANK
 
-from pasta_gpu.pasta import PASTA, pasta_uint8
-from pasta_gpu.reference_official import PASTA as OfficialPASTA
+from flashpasta.pasta import PASTA, pasta_uint8
+from flashpasta.reference_official import PASTA as OfficialPASTA
 
 
 def _pasta_from_env():

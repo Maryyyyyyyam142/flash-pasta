@@ -50,7 +50,7 @@ def main():
 
     from ultralytics import YOLO
 
-    from pasta_gpu.yolo_trainer import PastaDetectionTrainer
+    from flashpasta.yolo_trainer import PastaDetectionTrainer
 
     name = Path(args.out).stem
     YOLO(args.model).train(

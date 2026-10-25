@@ -1,6 +1,6 @@
 """Batched PASTA augmentation that runs on any torch device (GPU or CPU).
 
-It computes the same thing as the official transform (pasta_gpu/reference_official.py)
+It computes the same thing as the official transform (flashpasta/reference_official.py)
 but restructured for throughput:
 
 * Batched: one FFT call for a whole (B, C, H, W) batch instead of one per image.

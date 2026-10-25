@@ -13,7 +13,7 @@ from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from pasta_gpu.pasta import PASTA  # noqa: E402
+from flashpasta.pasta import PASTA  # noqa: E402
 
 FIG = ROOT / "figures"
 SIM10K = ROOT / "data/sim10k"

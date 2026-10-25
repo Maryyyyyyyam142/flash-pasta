@@ -72,23 +72,23 @@ All raw numbers are in `results/` and on the poster (`poster/poster.pdf`).
 
 ```python
 import torch
-from pasta_gpu.pasta import PASTA
+from flashpasta.pasta import PASTA
 
 pasta = PASTA(alpha=3.0, beta=0.25, k=2)          # paper defaults
 images = torch.rand(16, 3, 1052, 1914, device="cuda")  # float in [0, 1]
 augmented = pasta(images)
 ```
 
-For uint8 batches, `pasta_gpu.pasta.pasta_uint8(batch, pasta)` converts, augments and
+For uint8 batches, `flashpasta.pasta.pasta_uint8(batch, pasta)` converts, augments and
 converts back.
 
 ## Repository layout
 
 | Path | Contents |
 |---|---|
-| `pasta_gpu/pasta.py` | Batched implementation (GPU or CPU), `fft2` and `rfft2` paths |
-| `pasta_gpu/reference_official.py` | Official transform, verbatim (MIT), used as ground truth and CPU baseline |
-| `pasta_gpu/yolo_trainer.py` | Ultralytics trainer with PASTA in CPU workers or on the GPU, plus timing |
+| `flashpasta/pasta.py` | Batched implementation (GPU or CPU), `fft2` and `rfft2` paths |
+| `flashpasta/reference_official.py` | Official transform, verbatim (MIT), used as ground truth and CPU baseline |
+| `flashpasta/yolo_trainer.py` | Ultralytics trainer with PASTA in CPU workers or on the GPU, plus timing |
 | `tests/test_equivalence.py` | Exact and distributional checks against the official implementation |
 | `bench/bench_kernel.py` | Throughput of the transform alone: CPU process pool vs GPU |
 | `bench/bench_loader.py` | Images/s a DataLoader delivers vs number of CPU workers |
@@ -144,5 +144,5 @@ the loader gets fewer workers than requested. The run scripts use `.venv/bin/pyt
    Learning to Monitor Coral Reef Health.* ETASR 15(4), 2025, doi:10.48084/etasr.10324.
    Marjan dataset, Roboflow Universe (CC BY 4.0).
 
-`pasta_gpu/reference_official.py` is copied from the authors' repository under the MIT
+`flashpasta/reference_official.py` is copied from the authors' repository under the MIT
 License, Copyright (c) 2024 Prithvijit Chattopadhyay.
